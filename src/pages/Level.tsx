@@ -6,6 +6,10 @@ import AchievementPopup from '@/components/game/AchievementPopup';
 import Level1Interactive from './Level1Interactive';
 import Level2Interactive from './Level2Interactive';
 import Level3Interactive from './Level3Interactive';
+import Level4Interactive from './Level4Interactive';
+import Level5Interactive from './Level5Interactive';
+import Level6Interactive from './Level6Interactive';
+import Level7Interactive from './Level7Interactive';
 
 const Level = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +44,42 @@ const Level = () => {
     return (
       <>
         <Level3Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 4) {
+    return (
+      <>
+        <Level4Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 5) {
+    return (
+      <>
+        <Level5Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 6) {
+    return (
+      <>
+        <Level6Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 7) {
+    return (
+      <>
+        <Level7Interactive />
         <AchievementPopup />
       </>
     );
