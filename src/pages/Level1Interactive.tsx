@@ -123,6 +123,26 @@ const Particles = ({ color }: { color: string }) => (
   </>
 );
 
+const PackageTravel = () => {
+  const [arrived, setArrived] = useState(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setArrived(true), 1400);
+    return () => clearTimeout(t1);
+  }, []);
+  return (
+    <motion.div
+      className="absolute flex flex-col items-center"
+      style={{ top: '38%', left: arrived ? '72%' : '18%', transition: 'left 0.7s cubic-bezier(0.4,0,0.2,1)' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.6 }}
+    >
+      <span className="text-3xl">📦</span>
+      <p className="text-[10px] font-mono text-accent whitespace-nowrap">hello-world:latest</p>
+    </motion.div>
+  );
+};
+
 const AnimPull = ({ onDone }: { onDone: () => void }) => {
   useEffect(() => { const t = setTimeout(onDone, 3200); return () => clearTimeout(t); }, [onDone]);
   return (
