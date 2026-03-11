@@ -82,7 +82,18 @@
   .terminal-bg {
     background: #0D1117;
   }
+  .terminal-black {
+    background: #000000;
+  }
+  .dot-grid-24 {
+    background-image: radial-gradient(circle, hsl(215 30% 20% / 0.4) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
 }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: hsl(222 47% 7%); }
+::-webkit-scrollbar-thumb { background: hsl(215 30% 20%); border-radius: 2px; }
 
 @keyframes flowArrow {
   to { stroke-dashoffset: -24; }
