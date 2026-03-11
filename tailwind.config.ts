@@ -13,6 +13,7 @@ export default {
     extend: {
       fontFamily: {
         display: ['"Space Grotesk"', 'sans-serif'],
+        syne: ['"Syne"', 'sans-serif'],
         body: ['"Inter"', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
       },
