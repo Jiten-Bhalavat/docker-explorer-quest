@@ -4,6 +4,7 @@ import { levels } from '@/data/levelData';
 import LevelPlayer from '@/components/game/LevelPlayer';
 import AchievementPopup from '@/components/game/AchievementPopup';
 import Level1Interactive from './Level1Interactive';
+import Level2Interactive from './Level2Interactive';
 
 const Level = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,15 @@ const Level = () => {
     return (
       <>
         <Level1Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 2) {
+    return (
+      <>
+        <Level2Interactive />
         <AchievementPopup />
       </>
     );
