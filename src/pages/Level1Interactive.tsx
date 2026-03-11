@@ -140,12 +140,7 @@ const AnimPull = ({ onDone }: { onDone: () => void }) => {
         <motion.line x1="22%" y1="50%" x2="78%" y2="50%" stroke="#06B6D4" strokeWidth="2" strokeDasharray="6 4" style={{ animation: 'dashFlow 1s linear infinite' }} initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 0.6 }} transition={{ delay: 0.5, duration: 0.5 }} />
       </svg>
       {/* Package travels */}
-      <motion.div className="absolute flex flex-col items-center" initial={{ left: '18%', top: '38%', opacity: 0 }} animate={[{ opacity: 1, transition: { delay: 0.6 } }, { left: '72%', transition: { delay: 1.4, duration: 0.7, ease: [0.4, 0, 0.2, 1] } }]} transition={{ delay: 0.6 }}>
-        <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.6, duration: 0.3 }}>
-          <span className="text-3xl">📦</span>
-          <p className="text-[10px] font-mono text-accent whitespace-nowrap">hello-world:latest</p>
-        </motion.div>
-      </motion.div>
+      <PackageTravel />
       {/* Success bar */}
       <motion.div className="absolute bottom-6 left-1/2 -translate-x-1/2" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2.2 }}>
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
