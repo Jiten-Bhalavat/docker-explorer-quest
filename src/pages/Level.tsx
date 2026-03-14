@@ -10,6 +10,12 @@ import Level4Interactive from './Level4Interactive';
 import Level5Interactive from './Level5Interactive';
 import Level6Interactive from './Level6Interactive';
 import Level7Interactive from './Level7Interactive';
+import Level8Interactive from './Level8Interactive';
+import Level9Interactive from './Level9Interactive';
+import Level10Interactive from './Level10Interactive';
+import Level11Interactive from './Level11Interactive';
+import Level12Interactive from './Level12Interactive';
+import Level13Interactive from './Level13Interactive';
 
 const Level = () => {
   const { id } = useParams<{ id: string }>();
@@ -80,6 +86,60 @@ const Level = () => {
     return (
       <>
         <Level7Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 8) {
+    return (
+      <>
+        <Level8Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 9) {
+    return (
+      <>
+        <Level9Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 10) {
+    return (
+      <>
+        <Level10Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 11) {
+    return (
+      <>
+        <Level11Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 12) {
+    return (
+      <>
+        <Level12Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 13) {
+    return (
+      <>
+        <Level13Interactive />
         <AchievementPopup />
       </>
     );
