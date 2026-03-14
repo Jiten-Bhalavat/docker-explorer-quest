@@ -16,6 +16,7 @@ import Level10Interactive from './Level10Interactive';
 import Level11Interactive from './Level11Interactive';
 import Level12Interactive from './Level12Interactive';
 import Level13Interactive from './Level13Interactive';
+import Level14Interactive from './Level14Interactive';
 
 const Level = () => {
   const { id } = useParams<{ id: string }>();
@@ -140,6 +141,15 @@ const Level = () => {
     return (
       <>
         <Level13Interactive />
+        <AchievementPopup />
+      </>
+    );
+  }
+
+  if (levelId === 14) {
+    return (
+      <>
+        <Level14Interactive />
         <AchievementPopup />
       </>
     );
