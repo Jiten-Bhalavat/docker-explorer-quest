@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'why-compose' | 'compose-file' | 'compose-cmds' | 'dependencies' | 'full-stack';
 
@@ -178,10 +179,11 @@ const ServiceBox = ({ name, icon, status, color }: { name: string; icon: string;
 
 // ─── Animation 1: Why Compose ────────────────────────────────────────────────
 
-const AnimWhyCompose = ({ onDone }: { onDone: () => void }) => {
+const AnimWhyCompose = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [leftCmds, setLeftCmds] = useState<string[]>([]);
   const [phase, setPhase] = useState(0);
   const leftRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   const MANUAL_CMDS = [
     '$ docker network create app-net',
@@ -202,16 +204,15 @@ const AnimWhyCompose = ({ onDone }: { onDone: () => void }) => {
   useEffect(() => { leftRef.current?.scrollTo({ top: leftRef.current.scrollHeight, behavior: 'smooth' }); }, [leftCmds.length]);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
     MANUAL_CMDS.forEach((cmd, i) => {
-      t.push(setTimeout(() => setLeftCmds(prev => [...prev, cmd]), 200 + i * 180));
+      schedule(() => setLeftCmds(prev => [...prev, cmd]), 200 + i * 180);
     });
-    t.push(setTimeout(() => setPhase(1), 200 + MANUAL_CMDS.length * 180 + 200));
-    t.push(setTimeout(() => setPhase(2), 200 + MANUAL_CMDS.length * 180 + 800));
-    t.push(setTimeout(() => setPhase(3), 200 + MANUAL_CMDS.length * 180 + 1600));
-    t.push(setTimeout(onDone, 200 + MANUAL_CMDS.length * 180 + 2400));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 200 + MANUAL_CMDS.length * 180 + 200);
+    schedule(() => setPhase(2), 200 + MANUAL_CMDS.length * 180 + 800);
+    schedule(() => setPhase(3), 200 + MANUAL_CMDS.length * 180 + 1600);
+    schedule(onDone, 200 + MANUAL_CMDS.length * 180 + 2400);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -350,19 +351,19 @@ const SECTION_DETAILS: { type: string; icon: string; title: string; desc: string
   { type: 'infra', icon: '🏗️', title: 'volumes & networks', desc: "Top-level volumes and networks declare shared resources. Volumes and networks listed here are created by Docker Compose. Services are connected to them by name." },
 ];
 
-const AnimComposeFile = ({ onDone }: { onDone: () => void }) => {
+const AnimComposeFile = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [highlightType, setHighlightType] = useState<string | null>(null);
   const [detailIdx, setDetailIdx] = useState(-1);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
     SECTION_DETAILS.forEach((sec, i) => {
-      t.push(setTimeout(() => { setHighlightType(sec.type); setDetailIdx(i); }, i * 900));
+      schedule(() => { setHighlightType(sec.type); setDetailIdx(i); }, i * 900);
     });
-    t.push(setTimeout(() => setHighlightType(null), SECTION_DETAILS.length * 900));
-    t.push(setTimeout(onDone, SECTION_DETAILS.length * 900 + 400));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setHighlightType(null), SECTION_DETAILS.length * 900);
+    schedule(onDone, SECTION_DETAILS.length * 900 + 400);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const colorForLine = (line: typeof YAML_LINES[0], highlighted: boolean) => {
     if (!highlighted) return 'text-foreground/40';
@@ -415,7 +416,7 @@ const AnimComposeFile = ({ onDone }: { onDone: () => void }) => {
 type SvcStatus = 'stopped' | 'starting' | 'running';
 interface SvcRow { name: string; image: string; port?: string; status: SvcStatus }
 
-const AnimComposeCmds = ({ onDone }: { onDone: () => void }) => {
+const AnimComposeCmds = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [termLines, setTermLines] = useState<{ text: string; isCmd?: boolean; isSuccess?: boolean }[]>([]);
   const [services, setServices] = useState<SvcRow[]>([
     { name: 'postgres', image: 'postgres:15', port: '5432/tcp', status: 'stopped' },
@@ -425,20 +426,18 @@ const AnimComposeCmds = ({ onDone }: { onDone: () => void }) => {
   ]);
   const [showServices, setShowServices] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [termLines.length]);
 
   const setAllStatus = (s: SvcStatus) => setServices(prev => prev.map(svc => ({ ...svc, status: s })));
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-
-    // Step 1: docker compose up
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker compose up -d', isCmd: true }]);
       setAllStatus('starting');
-    }, 200));
-    t.push(setTimeout(() => {
+    }, 200);
+    schedule(() => {
       setTermLines(p => [...p,
         { text: '[+] Running 4/4' },
         { text: ' ✔ Container myapp-postgres-1  Started', isSuccess: true },
@@ -447,30 +446,27 @@ const AnimComposeCmds = ({ onDone }: { onDone: () => void }) => {
         { text: ' ✔ Container myapp-web-1       Started', isSuccess: true },
       ]);
       setAllStatus('running');
-    }, 900));
+    }, 900);
 
-    // Step 2: docker compose ps
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker compose ps', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'NAME                IMAGE        STATUS   PORTS' }, { text: 'myapp-postgres-1    postgres:15  running  5432/tcp\nmyapp-redis-1       redis:alpine running\nmyapp-api-1         my-api       running  0.0.0.0:3000->3000/tcp\nmyapp-web-1         my-web       running  0.0.0.0:80->80/tcp' }]), 200);
-    }, 1800));
+      schedule(() => setTermLines(p => [...p, { text: 'NAME                IMAGE        STATUS   PORTS' }, { text: 'myapp-postgres-1    postgres:15  running  5432/tcp\nmyapp-redis-1       redis:alpine running\nmyapp-api-1         my-api       running  0.0.0.0:3000->3000/tcp\nmyapp-web-1         my-web       running  0.0.0.0:80->80/tcp' }]), 200);
+    }, 1800);
 
-    // Step 3: docker compose logs
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker compose logs api', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p,
+      schedule(() => setTermLines(p => [...p,
         { text: 'myapp-api-1  | Server started on port 3000', isSuccess: true },
         { text: 'myapp-api-1  | Connected to postgres ✓', isSuccess: true },
         { text: 'myapp-api-1  | Connected to redis ✓', isSuccess: true },
       ]), 200);
-    }, 2700));
+    }, 2700);
 
-    // Step 4: docker compose down
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker compose down', isCmd: true }]);
       setAllStatus('starting');
-    }, 3400));
-    t.push(setTimeout(() => {
+    }, 3400);
+    schedule(() => {
       setTermLines(p => [...p,
         { text: ' ✔ Container myapp-web-1       Removed' },
         { text: ' ✔ Container myapp-api-1       Removed' },
@@ -478,20 +474,19 @@ const AnimComposeCmds = ({ onDone }: { onDone: () => void }) => {
         { text: ' ✔ Container myapp-postgres-1  Removed' },
       ]);
       setAllStatus('stopped');
-    }, 3800));
+    }, 3800);
 
-    // Step 5: down -v
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker compose down -v', isCmd: true }]);
-      setTimeout(() => {
+      schedule(() => {
         setTermLines(p => [...p, { text: '⚠️ pgdata volume also removed', isSuccess: false }]);
         setShowServices(true);
       }, 200);
-    }, 4100));
+    }, 4100);
 
-    t.push(setTimeout(onDone, 4800));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 4800);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -535,28 +530,28 @@ const AnimComposeCmds = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 4: Dependencies & Health Checks ──────────────────────────────
 
-const AnimDependencies = ({ onDone }: { onDone: () => void }) => {
+const AnimDependencies = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [nodeStates, setNodeStates] = useState<Record<string, 'gray' | 'starting' | 'healthy' | 'running'>>({ postgres: 'gray', redis: 'gray', api: 'gray', web: 'gray' });
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-    t.push(setTimeout(() => setPhase(1), 600));
-    t.push(setTimeout(() => {
+    schedule(() => setPhase(1), 600);
+    schedule(() => {
       setPhase(2);
       setNodeStates(prev => ({ ...prev, postgres: 'starting', redis: 'starting' }));
-    }, 1200));
-    t.push(setTimeout(() => setNodeStates(prev => ({ ...prev, redis: 'running' })), 1800));
-    t.push(setTimeout(() => setNodeStates(prev => ({ ...prev, postgres: 'healthy' })), 2600));
-    t.push(setTimeout(() => {
+    }, 1200);
+    schedule(() => setNodeStates(prev => ({ ...prev, redis: 'running' })), 1800);
+    schedule(() => setNodeStates(prev => ({ ...prev, postgres: 'healthy' })), 2600);
+    schedule(() => {
       setNodeStates(prev => ({ ...prev, api: 'starting' }));
-    }, 3000));
-    t.push(setTimeout(() => setNodeStates(prev => ({ ...prev, api: 'running' })), 3500));
-    t.push(setTimeout(() => setNodeStates(prev => ({ ...prev, web: 'starting' })), 3800));
-    t.push(setTimeout(() => { setNodeStates(prev => ({ ...prev, web: 'running' })); setPhase(3); }, 4200));
-    t.push(setTimeout(onDone, 4800));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    }, 3000);
+    schedule(() => setNodeStates(prev => ({ ...prev, api: 'running' })), 3500);
+    schedule(() => setNodeStates(prev => ({ ...prev, web: 'starting' })), 3800);
+    schedule(() => { setNodeStates(prev => ({ ...prev, web: 'running' })); setPhase(3); }, 4200);
+    schedule(onDone, 4800);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const nodeColor = (s: string) => {
     const st = nodeStates[s];
@@ -678,25 +673,24 @@ interval: 5s | timeout: 3s | retries: 5 | start_period: 10s`}</pre>
 
 // ─── Animation 5: Full Stack ─────────────────────────────────────────────────
 
-const AnimFullStack = ({ onDone }: { onDone: () => void }) => {
+const AnimFullStack = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [glowHop, setGlowHop] = useState(-1);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-    t.push(setTimeout(() => setPhase(1), 400));
-    t.push(setTimeout(() => setPhase(2), 1200));
-    t.push(setTimeout(() => setPhase(3), 2000));
-    t.push(setTimeout(() => setPhase(4), 2900));
-    // Request journey glow
-    t.push(setTimeout(() => setGlowHop(0), 3400));
-    t.push(setTimeout(() => setGlowHop(1), 3700));
-    t.push(setTimeout(() => setGlowHop(2), 4000));
-    t.push(setTimeout(() => setGlowHop(3), 4300));
-    t.push(setTimeout(() => setGlowHop(-1), 4600));
-    t.push(setTimeout(onDone, 5000));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 400);
+    schedule(() => setPhase(2), 1200);
+    schedule(() => setPhase(3), 2000);
+    schedule(() => setPhase(4), 2900);
+    schedule(() => setGlowHop(0), 3400);
+    schedule(() => setGlowHop(1), 3700);
+    schedule(() => setGlowHop(2), 4000);
+    schedule(() => setGlowHop(3), 4300);
+    schedule(() => setGlowHop(-1), 4600);
+    schedule(onDone, 5000);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const layers: { phase: number; color: string; label: string; tint: string; services: { icon: string; name: string; detail: string }[] }[] = [
     { phase: 1, color: '#8B5CF6', label: 'Data Layer', tint: '#8B5CF610', services: [{ icon: '🗄️', name: 'postgres:15', detail: 'Primary Database' }, { icon: '📦', name: 'redis:7-alpine', detail: 'Cache / Sessions' }] },
@@ -780,7 +774,9 @@ const Level11Interactive = () => {
   const [infoLines, setInfoLines] = useState<{ text: string; type: 'cmd' | 'output' }[]>([]);
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
+  const [paused, setPaused] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+  const logTimers = usePausableTimers(paused);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -788,12 +784,13 @@ const Level11Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
     const log = INFO_LOGS[id];
     const allLines = [{ text: log.prefix, type: 'cmd' as const }, ...log.lines.map(l => ({ text: l, type: 'output' as const }))];
-    allLines.forEach((line, i) => { setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120); });
-  }, [animating]);
+    allLines.forEach((line, i) => { logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120); });
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -803,9 +800,9 @@ const Level11Interactive = () => {
     setCompleted(next);
     setAnimating(false);
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(11)) completeLevel(11);
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(11)) completeLevel(11);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -882,15 +879,23 @@ const Level11Interactive = () => {
                     <span className="text-xs font-mono" style={{ color: TOPICS.find(t => t.id === active)!.color }}>{TOPICS.find(t => t.id === active)!.label}</span>
                   </div>
                   <div className="absolute inset-0 pt-8">
-                    {active === 'why-compose' && <AnimWhyCompose onDone={handleAnimDone} />}
-                    {active === 'compose-file' && <AnimComposeFile onDone={handleAnimDone} />}
-                    {active === 'compose-cmds' && <AnimComposeCmds onDone={handleAnimDone} />}
-                    {active === 'dependencies' && <AnimDependencies onDone={handleAnimDone} />}
-                    {active === 'full-stack' && <AnimFullStack onDone={handleAnimDone} />}
+                    {active === 'why-compose' && <AnimWhyCompose onDone={handleAnimDone} paused={paused} />}
+                    {active === 'compose-file' && <AnimComposeFile onDone={handleAnimDone} paused={paused} />}
+                    {active === 'compose-cmds' && <AnimComposeCmds onDone={handleAnimDone} paused={paused} />}
+                    {active === 'dependencies' && <AnimDependencies onDone={handleAnimDone} paused={paused} />}
+                    {active === 'full-stack' && <AnimFullStack onDone={handleAnimDone} paused={paused} />}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           {/* Terminal log */}

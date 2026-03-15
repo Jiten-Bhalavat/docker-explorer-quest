@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'vm-arch' | 'container-arch' | 'comparison' | 'isolation' | 'resources';
 
@@ -222,8 +223,9 @@ const LayerBox = ({
 
 // ─── Animation 1: VM Architecture ────────────────────────────────────────────
 
-const AnimVMArch = ({ onDone }: { onDone: () => void }) => {
-  useEffect(() => { const t = setTimeout(onDone, 3200); return () => clearTimeout(t); }, [onDone]);
+const AnimVMArch = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
+  const { schedule, clearAll } = usePausableTimers(paused);
+  useEffect(() => { schedule(onDone, 3200); return clearAll; }, [onDone, schedule, clearAll]);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden px-4">
@@ -313,8 +315,9 @@ const AnimVMArch = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 2: Container Architecture ─────────────────────────────────────
 
-const AnimContainerArch = ({ onDone }: { onDone: () => void }) => {
-  useEffect(() => { const t = setTimeout(onDone, 3200); return () => clearTimeout(t); }, [onDone]);
+const AnimContainerArch = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
+  const { schedule, clearAll } = usePausableTimers(paused);
+  useEffect(() => { schedule(onDone, 3200); return clearAll; }, [onDone, schedule, clearAll]);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden px-4">
@@ -397,8 +400,9 @@ const COMPARISON_ROWS: { label: string; left: string; right: string; neutral?: b
   { label: 'Performance', left: 'Overhead from hypervisor', right: 'Near-native performance' },
 ];
 
-const AnimComparison = ({ onDone }: { onDone: () => void }) => {
-  useEffect(() => { const t = setTimeout(onDone, 3200); return () => clearTimeout(t); }, [onDone]);
+const AnimComparison = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
+  const { schedule, clearAll } = usePausableTimers(paused);
+  useEffect(() => { schedule(onDone, 3200); return clearAll; }, [onDone, schedule, clearAll]);
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden px-4">
@@ -475,16 +479,17 @@ const ISOLATION_CONTAINERS = [
   { name: 'Container C', tech: 'Java v11', app: 'Spring App', port: '8080', from: { x: 40, y: 0 } },
 ];
 
-const AnimIsolation = ({ onDone }: { onDone: () => void }) => {
+const AnimIsolation = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [showWalls, setShowWalls] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setShowWalls(true), 1400);
-    const t2 = setTimeout(() => setShowLabels(true), 1800);
-    const t3 = setTimeout(onDone, 2800);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, [onDone]);
+    schedule(() => setShowWalls(true), 1400);
+    schedule(() => setShowLabels(true), 1800);
+    schedule(onDone, 2800);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden px-4">
@@ -629,8 +634,9 @@ const BarChart = ({
   </div>
 );
 
-const AnimResources = ({ onDone }: { onDone: () => void }) => {
-  useEffect(() => { const t = setTimeout(onDone, 3000); return () => clearTimeout(t); }, [onDone]);
+const AnimResources = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
+  const { schedule, clearAll } = usePausableTimers(paused);
+  useEffect(() => { schedule(onDone, 3000); return clearAll; }, [onDone, schedule, clearAll]);
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden px-6">
@@ -663,6 +669,8 @@ const Level2Interactive = () => {
   const [infoLines, setInfoLines] = useState<{ text: string; type: 'cmd' | 'output' }[]>([]);
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const logTimers = usePausableTimers(paused);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -671,6 +679,7 @@ const Level2Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
 
@@ -680,9 +689,9 @@ const Level2Interactive = () => {
       ...log.lines.map(l => ({ text: l, type: 'output' as const })),
     ];
     allLines.forEach((line, i) => {
-      setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120);
+      logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120);
     });
-  }, [animating]);
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -693,10 +702,10 @@ const Level2Interactive = () => {
     setAnimating(false);
 
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(2)) completeLevel(2);
 
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(2)) completeLevel(2);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -802,14 +811,22 @@ const Level2Interactive = () => {
                       {TOPICS.find(t => t.id === active)!.label}
                     </span>
                   </div>
-                  {active === 'vm-arch' && <AnimVMArch onDone={handleAnimDone} />}
-                  {active === 'container-arch' && <AnimContainerArch onDone={handleAnimDone} />}
-                  {active === 'comparison' && <AnimComparison onDone={handleAnimDone} />}
-                  {active === 'isolation' && <AnimIsolation onDone={handleAnimDone} />}
-                  {active === 'resources' && <AnimResources onDone={handleAnimDone} />}
+                  {active === 'vm-arch' && <AnimVMArch onDone={handleAnimDone} paused={paused} />}
+                  {active === 'container-arch' && <AnimContainerArch onDone={handleAnimDone} paused={paused} />}
+                  {active === 'comparison' && <AnimComparison onDone={handleAnimDone} paused={paused} />}
+                  {active === 'isolation' && <AnimIsolation onDone={handleAnimDone} paused={paused} />}
+                  {active === 'resources' && <AnimResources onDone={handleAnimDone} paused={paused} />}
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           {/* Info Log (Terminal-style) */}

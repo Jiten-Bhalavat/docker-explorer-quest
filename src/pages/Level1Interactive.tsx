@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type CommandId = 'pull' | 'images' | 'run' | 'ps' | 'stop';
 
@@ -143,8 +144,9 @@ const PackageTravel = () => {
   );
 };
 
-const AnimPull = ({ onDone }: { onDone: () => void }) => {
-  useEffect(() => { const t = setTimeout(onDone, 3200); return () => clearTimeout(t); }, [onDone]);
+const AnimPull = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
+  const { schedule, clearAll } = usePausableTimers(paused);
+  useEffect(() => { schedule(onDone, 3200); return clearAll; }, [onDone, schedule, clearAll]);
   return (
     <div className="relative w-full h-full flex items-center justify-center">
       <motion.div className="absolute left-[10%] flex flex-col items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
@@ -183,8 +185,9 @@ const TableRow = ({ cells, delay, colorIdx }: { cells: string[]; delay: number; 
   </motion.tr>
 );
 
-const AnimImages = ({ onDone }: { onDone: () => void }) => {
-  useEffect(() => { const t = setTimeout(onDone, 2200); return () => clearTimeout(t); }, [onDone]);
+const AnimImages = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
+  const { schedule, clearAll } = usePausableTimers(paused);
+  useEffect(() => { schedule(onDone, 2200); return clearAll; }, [onDone, schedule, clearAll]);
   return (
     <div className="flex flex-col items-center justify-center h-full px-4">
       <table className="border-collapse">
@@ -206,8 +209,9 @@ const AnimImages = ({ onDone }: { onDone: () => void }) => {
   );
 };
 
-const AnimRun = ({ onDone }: { onDone: () => void }) => {
-  useEffect(() => { const t = setTimeout(onDone, 3000); return () => clearTimeout(t); }, [onDone]);
+const AnimRun = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
+  const { schedule, clearAll } = usePausableTimers(paused);
+  useEffect(() => { schedule(onDone, 3000); return clearAll; }, [onDone, schedule, clearAll]);
   return (
     <div className="relative w-full h-full flex items-center justify-center gap-8">
       <motion.div className="flex flex-col items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
@@ -240,8 +244,9 @@ const AnimRun = ({ onDone }: { onDone: () => void }) => {
   );
 };
 
-const AnimPs = ({ onDone }: { onDone: () => void }) => {
-  useEffect(() => { const t = setTimeout(onDone, 2200); return () => clearTimeout(t); }, [onDone]);
+const AnimPs = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
+  const { schedule, clearAll } = usePausableTimers(paused);
+  useEffect(() => { schedule(onDone, 2200); return clearAll; }, [onDone, schedule, clearAll]);
   return (
     <div className="flex flex-col items-center justify-center h-full px-4">
       <table className="border-collapse">
@@ -284,17 +289,16 @@ const AnimPs = ({ onDone }: { onDone: () => void }) => {
   );
 };
 
-const AnimStop = ({ onDone }: { onDone: () => void }) => {
+const AnimStop = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
   useEffect(() => {
-    const timers = [
-      setTimeout(() => setPhase(1), 700),
-      setTimeout(() => setPhase(2), 1400),
-      setTimeout(() => setPhase(3), 2000),
-      setTimeout(() => { setPhase(4); onDone(); }, 2600),
-    ];
-    return () => timers.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 700);
+    schedule(() => setPhase(2), 1400);
+    schedule(() => setPhase(3), 2000);
+    schedule(() => { setPhase(4); onDone(); }, 2600);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const borderColor = phase >= 3 ? 'border-muted-foreground/30' : phase >= 1 ? 'border-amber-500' : 'border-emerald-500';
   const bgColor = phase >= 3 ? 'bg-muted/10' : phase >= 1 ? 'bg-amber-500/5' : 'bg-emerald-500/10';
@@ -340,6 +344,8 @@ const Level1Interactive = () => {
   const [terminalLines, setTerminalLines] = useState<{ text: string; type: 'cmd' | 'output' }[]>([]);
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const logTimers = usePausableTimers(paused);
   const termRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -348,6 +354,7 @@ const Level1Interactive = () => {
 
   const runCommand = useCallback((id: CommandId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
 
@@ -355,9 +362,9 @@ const Level1Interactive = () => {
     const output = TERMINAL_OUTPUTS[id];
     const allLines = [{ text: output.prefix, type: 'cmd' as const }, ...output.lines.map(l => ({ text: l, type: 'output' as const }))];
     allLines.forEach((line, i) => {
-      setTimeout(() => setTerminalLines(prev => [...prev, line]), i * 120);
+      logTimers.schedule(() => setTerminalLines(prev => [...prev, line]), i * 120);
     });
-  }, [animating]);
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -370,10 +377,10 @@ const Level1Interactive = () => {
     if (wasNew) {
       setLocalXP(prev => prev + 20);
     }
+    if (wasNew && !completedLevels.includes(1)) completeLevel(1);
 
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(1)) completeLevel(1);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -464,14 +471,22 @@ const Level1Interactive = () => {
                       {COMMANDS.find(c => c.id === active)!.label}
                     </span>
                   </div>
-                  {active === 'pull' && <AnimPull onDone={handleAnimDone} />}
-                  {active === 'images' && <AnimImages onDone={handleAnimDone} />}
-                  {active === 'run' && <AnimRun onDone={handleAnimDone} />}
-                  {active === 'ps' && <AnimPs onDone={handleAnimDone} />}
-                  {active === 'stop' && <AnimStop onDone={handleAnimDone} />}
+                  {active === 'pull' && <AnimPull onDone={handleAnimDone} paused={paused} />}
+                  {active === 'images' && <AnimImages onDone={handleAnimDone} paused={paused} />}
+                  {active === 'run' && <AnimRun onDone={handleAnimDone} paused={paused} />}
+                  {active === 'ps' && <AnimPs onDone={handleAnimDone} paused={paused} />}
+                  {active === 'stop' && <AnimStop onDone={handleAnimDone} paused={paused} />}
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           {/* Terminal Output */}

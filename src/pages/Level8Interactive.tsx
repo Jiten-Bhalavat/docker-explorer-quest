@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'context' | 'flags' | 'cache' | 'buildkit' | 'multiplatform';
 
@@ -171,19 +172,18 @@ const FILE_TREE = [
   { name: '.dockerignore', icon: '📄', indent: 1, size: '', special: true },
 ];
 
-const AnimContext = ({ onDone }: { onDone: () => void }) => {
+const AnimContext = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 1200),
-      setTimeout(() => setPhase(2), 1700),
-      setTimeout(() => setPhase(3), 2400),
-      setTimeout(() => setPhase(4), 3200),
-      setTimeout(onDone, 4000),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 1200);
+    schedule(() => setPhase(2), 1700);
+    schedule(() => setPhase(3), 2400);
+    schedule(() => setPhase(4), 3200);
+    schedule(onDone, 4000);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -292,19 +292,18 @@ const QUICK_REF = [
   'docker build --target builder -t myapp:dev .',
 ];
 
-const AnimFlags = ({ onDone }: { onDone: () => void }) => {
+const AnimFlags = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 800),
-      setTimeout(() => setPhase(2), 3000),
-      setTimeout(() => setPhase(3), 4000),
-      setTimeout(() => setPhase(4), 4600),
-      setTimeout(onDone, 5300),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 800);
+    schedule(() => setPhase(2), 3000);
+    schedule(() => setPhase(3), 4000);
+    schedule(() => setPhase(4), 4600);
+    schedule(onDone, 5300);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4 gap-3 overflow-y-auto">
@@ -367,11 +366,12 @@ const AnimFlags = ({ onDone }: { onDone: () => void }) => {
 
 interface CacheLayer { label: string; status: 'empty' | 'new' | 'cached'; time: string }
 
-const AnimCache = ({ onDone }: { onDone: () => void }) => {
+const AnimCache = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [termLines, setTermLines] = useState<{ text: string; isCmd?: boolean; isSuccess?: boolean }[]>([]);
   const [layers, setLayers] = useState<CacheLayer[]>(Array(6).fill(null).map(() => ({ label: '', status: 'empty', time: '' })));
   const [buildTime, setBuildTime] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [termLines.length]);
 
@@ -387,43 +387,40 @@ const AnimCache = ({ onDone }: { onDone: () => void }) => {
       { label: 'CMD', time: '10ms' },
     ];
 
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    // First build
-    timers.push(setTimeout(() => setTermLines(p => [...p, { text: '$ docker build -t my-app .', isCmd: true }]), 200));
+    schedule(() => setTermLines(p => [...p, { text: '$ docker build -t my-app .', isCmd: true }]), 200);
     const firstStarts = [400, 800, 1300, 1700, 2500, 2700];
     firstStarts.forEach((t, i) => {
-      timers.push(setTimeout(() => {
+      schedule(() => {
         setTermLines(p => [...p, { text: `Step ${i + 1}/6 : ${L[i].label}` }]);
-        if (i === 3) { setTimeout(() => setTermLines(p => [...p, { text: '  added 127 packages in 8.3s' }]), 200); }
+        if (i === 3) { schedule(() => setTermLines(p => [...p, { text: '  added 127 packages in 8.3s' }]), 200); }
         updateLayer(i, { label: L[i].label, status: 'new', time: L[i].time });
-      }, t));
+      }, t);
     });
-    timers.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: 'Successfully built ✓', isSuccess: true }]);
       setBuildTime('First build: 13.2s');
-    }, 3000));
+    }, 3000);
 
-    // Second build
-    timers.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '── Code change (server.js edited) ──' }]);
       setTermLines(p => [...p, { text: '$ docker build -t my-app .', isCmd: true }]);
-    }, 3400));
+    }, 3400);
     const secondStarts = [3700, 3900, 4100, 4300, 4600, 4750];
     secondStarts.forEach((t, i) => {
-      timers.push(setTimeout(() => {
+      schedule(() => {
         const cached = i < 4;
         setTermLines(p => [...p, { text: `Step ${i + 1}/6 : ${L[i].label} ${cached ? '→ Using cache' : '→ REBUILD'}` }]);
-        if (i === 3 && cached) setTimeout(() => setTermLines(p => [...p, { text: '  npm install SKIPPED — package.json unchanged!' }]), 100);
+        if (i === 3 && cached) schedule(() => setTermLines(p => [...p, { text: '  npm install SKIPPED — package.json unchanged!' }]), 100);
         updateLayer(i, { status: cached ? 'cached' : 'new', time: cached ? '0ms' : L[i].time });
-      }, t));
+      }, t);
     });
-    timers.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: 'Successfully built ✓', isSuccess: true }]);
       setBuildTime('Second build: 0.8s');
-    }, 5000));
-    timers.push(setTimeout(onDone, 5800));
-    return () => timers.forEach(clearTimeout);
-  }, [onDone]);
+    }, 5000);
+    schedule(onDone, 5800);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -529,19 +526,18 @@ const BUILDKIT_DF = [
   'CMD ["node", "server.js"]',
 ];
 
-const AnimBuildKit = ({ onDone }: { onDone: () => void }) => {
+const AnimBuildKit = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 700),
-      setTimeout(() => setPhase(2), 1500),
-      setTimeout(() => setPhase(3), 2300),
-      setTimeout(() => setPhase(4), 2900),
-      setTimeout(onDone, 3700),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 700);
+    schedule(() => setPhase(2), 1500);
+    schedule(() => setPhase(3), 2300);
+    schedule(() => setPhase(4), 2900);
+    schedule(onDone, 3700);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const argLines = [3, 4, 5];
 
@@ -648,65 +644,63 @@ const PLATFORMS = [
   { label: 'windows/amd64', icon: '🪟' },
 ];
 
-const AnimMultiPlatform = ({ onDone }: { onDone: () => void }) => {
+const AnimMultiPlatform = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [termLines, setTermLines] = useState<{ text: string; isCmd?: boolean; isSuccess?: boolean }[]>([]);
   const [litPlatforms, setLitPlatforms] = useState<Set<number>>(new Set());
   const [phase, setPhase] = useState(0);
   const [progress, setProgress] = useState<number[]>([0, 0]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [termLines.length]);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker build -t myapp .', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: "WARNING: platform (linux/amd64) doesn't match host (linux/arm64)" }]), 300);
-    }, 200));
+      schedule(() => setTermLines(p => [...p, { text: "WARNING: platform (linux/amd64) doesn't match host (linux/arm64)" }]), 300);
+    }, 200);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setPhase(1);
       setTermLines(p => [...p, { text: '$ docker buildx ls', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'NAME           DRIVER             STATUS' }]), 150);
-      setTimeout(() => setTermLines(p => [...p, { text: 'default *      docker             running' }]), 300);
-    }, 900));
+      schedule(() => setTermLines(p => [...p, { text: 'NAME           DRIVER             STATUS' }]), 150);
+      schedule(() => setTermLines(p => [...p, { text: 'default *      docker             running' }]), 300);
+    }, 900);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setPhase(2);
       setTermLines(p => [...p, { text: '$ docker buildx create --name mybuilder --use', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'mybuilder', isSuccess: true }]), 200);
-      setTimeout(() => setTermLines(p => [...p, { text: '$ docker buildx inspect --bootstrap', isCmd: true }]), 400);
-      setTimeout(() => setTermLines(p => [...p, { text: 'Platforms: linux/amd64, linux/arm64, linux/arm/v7' }]), 600);
-      setTimeout(() => setLitPlatforms(new Set([0])), 600);
-      setTimeout(() => setLitPlatforms(new Set([0, 1])), 800);
-      setTimeout(() => setLitPlatforms(new Set([0, 1, 2])), 1000);
-    }, 1500));
+      schedule(() => setTermLines(p => [...p, { text: 'mybuilder', isSuccess: true }]), 200);
+      schedule(() => setTermLines(p => [...p, { text: '$ docker buildx inspect --bootstrap', isCmd: true }]), 400);
+      schedule(() => setTermLines(p => [...p, { text: 'Platforms: linux/amd64, linux/arm64, linux/arm/v7' }]), 600);
+      schedule(() => setLitPlatforms(new Set([0])), 600);
+      schedule(() => setLitPlatforms(new Set([0, 1])), 800);
+      schedule(() => setLitPlatforms(new Set([0, 1, 2])), 1000);
+    }, 1500);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setPhase(3);
       setTermLines(p => [...p, { text: '$ docker buildx build --platform linux/amd64,linux/arm64 -t user/myapp:latest --push .', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: '[+] Building 45.2s' }]), 200);
-      setTimeout(() => setTermLines(p => [...p, { text: '=> [linux/amd64] FROM + RUN  ✓', isSuccess: true }]), 500);
-      setTimeout(() => setTermLines(p => [...p, { text: '=> [linux/arm64] FROM + RUN  ✓', isSuccess: true }]), 700);
-      setTimeout(() => setTermLines(p => [...p, { text: '=> pushing manifest list...  ✓', isSuccess: true }]), 900);
-      // Parallel progress
+      schedule(() => setTermLines(p => [...p, { text: '[+] Building 45.2s' }]), 200);
+      schedule(() => setTermLines(p => [...p, { text: '=> [linux/amd64] FROM + RUN  ✓', isSuccess: true }]), 500);
+      schedule(() => setTermLines(p => [...p, { text: '=> [linux/arm64] FROM + RUN  ✓', isSuccess: true }]), 700);
+      schedule(() => setTermLines(p => [...p, { text: '=> pushing manifest list...  ✓', isSuccess: true }]), 900);
       let frame = 0;
       const iv = setInterval(() => {
         frame++;
         setProgress([Math.min(frame * 8, 100), Math.min(frame * 8, 100)]);
         if (frame >= 13) clearInterval(iv);
       }, 80);
-      t.push(setTimeout(() => clearInterval(iv), 1500) as any);
-    }, 2400));
+      schedule(() => clearInterval(iv), 1500);
+    }, 2400);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setPhase(4);
-    }, 3400));
+    }, 3400);
 
-    t.push(setTimeout(onDone, 4200));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 4200);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -797,6 +791,8 @@ const Level8Interactive = () => {
   const [infoLines, setInfoLines] = useState<{ text: string; type: 'cmd' | 'output' }[]>([]);
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const logTimers = usePausableTimers(paused);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -805,12 +801,13 @@ const Level8Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
     const log = INFO_LOGS[id];
     const allLines = [{ text: log.prefix, type: 'cmd' as const }, ...log.lines.map(l => ({ text: l, type: 'output' as const }))];
-    allLines.forEach((line, i) => { setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120); });
-  }, [animating]);
+    allLines.forEach((line, i) => { logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120); });
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -820,9 +817,10 @@ const Level8Interactive = () => {
     setCompleted(next);
     setAnimating(false);
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(8)) completeLevel(8);
+
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(8)) completeLevel(8);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -892,15 +890,23 @@ const Level8Interactive = () => {
                     <span className="text-xs font-mono" style={{ color: TOPICS.find(t => t.id === active)!.color }}>{TOPICS.find(t => t.id === active)!.label}</span>
                   </div>
                   <div className="absolute inset-0 pt-8">
-                    {active === 'context' && <AnimContext onDone={handleAnimDone} />}
-                    {active === 'flags' && <AnimFlags onDone={handleAnimDone} />}
-                    {active === 'cache' && <AnimCache onDone={handleAnimDone} />}
-                    {active === 'buildkit' && <AnimBuildKit onDone={handleAnimDone} />}
-                    {active === 'multiplatform' && <AnimMultiPlatform onDone={handleAnimDone} />}
+                    {active === 'context' && <AnimContext onDone={handleAnimDone} paused={paused} />}
+                    {active === 'flags' && <AnimFlags onDone={handleAnimDone} paused={paused} />}
+                    {active === 'cache' && <AnimCache onDone={handleAnimDone} paused={paused} />}
+                    {active === 'buildkit' && <AnimBuildKit onDone={handleAnimDone} paused={paused} />}
+                    {active === 'multiplatform' && <AnimMultiPlatform onDone={handleAnimDone} paused={paused} />}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           <div className="shrink-0 border-t border-border" style={{ height: 200 }}>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'data-loss' | 'named-volumes' | 'bind-mounts' | 'volume-cmds' | 'patterns';
 
@@ -156,20 +157,19 @@ const VolumeCylinder = ({ label, color, size, glow }: { label: string; color: st
 
 // ─── Animation 1: Data Loss Problem ──────────────────────────────────────────
 
-const AnimDataLoss = ({ onDone }: { onDone: () => void }) => {
+const AnimDataLoss = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [records, setRecords] = useState(50000);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 900),
-      setTimeout(() => setPhase(2), 1600),
-      setTimeout(() => setPhase(3), 2500),
-      setTimeout(() => setPhase(4), 3200),
-      setTimeout(onDone, 4200),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 900);
+    schedule(() => setPhase(2), 1600);
+    schedule(() => setPhase(3), 2500);
+    schedule(() => setPhase(4), 3200);
+    schedule(onDone, 4200);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   useEffect(() => {
     if (phase !== 2) return;
@@ -280,51 +280,51 @@ const TermHeader = ({ title }: { title: string }) => (
 
 // ─── Animation 2: Named Volumes ──────────────────────────────────────────────
 
-const AnimNamedVolumes = ({ onDone }: { onDone: () => void }) => {
+const AnimNamedVolumes = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [termLines, setTermLines] = useState<{ text: string; isCmd?: boolean; isSuccess?: boolean }[]>([]);
   const [volSize, setVolSize] = useState('0B');
   const [volExists, setVolExists] = useState(false);
   const [container, setContainer] = useState<string | null>(null);
   const [dataLabel, setDataLabel] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [termLines.length]);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker volume create pgdata', isCmd: true }]);
-      setTimeout(() => { setTermLines(p => [...p, { text: 'pgdata', isSuccess: true }]); setVolExists(true); }, 200);
-    }, 200));
+      schedule(() => { setTermLines(p => [...p, { text: 'pgdata', isSuccess: true }]); setVolExists(true); }, 200);
+    }, 200);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker run -d -v pgdata:/var/lib/postgresql/data --name postgres-db postgres:15', isCmd: true }]);
-      setTimeout(() => { setTermLines(p => [...p, { text: 'a1b2c3d4e5f6' }]); setContainer('postgres-db'); }, 300);
-    }, 900));
+      schedule(() => { setTermLines(p => [...p, { text: 'a1b2c3d4e5f6' }]); setContainer('postgres-db'); }, 300);
+    }, 900);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker exec postgres-db psql -U postgres -c "CREATE TABLE users..."', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'CREATE TABLE' }]), 200);
-      setTimeout(() => setTermLines(p => [...p, { text: '$ docker exec postgres-db psql -c "INSERT INTO users VALUES..."', isCmd: true }]), 400);
-      setTimeout(() => { setTermLines(p => [...p, { text: 'INSERT 0 2', isSuccess: true }]); setVolSize('8.2MB'); setDataLabel('users (2 rows)'); }, 600);
-    }, 2000));
+      schedule(() => setTermLines(p => [...p, { text: 'CREATE TABLE' }]), 200);
+      schedule(() => setTermLines(p => [...p, { text: '$ docker exec postgres-db psql -c "INSERT INTO users VALUES..."', isCmd: true }]), 400);
+      schedule(() => { setTermLines(p => [...p, { text: 'INSERT 0 2', isSuccess: true }]); setVolSize('8.2MB'); setDataLabel('users (2 rows)'); }, 600);
+    }, 2000);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker stop postgres-db && docker rm postgres-db', isCmd: true }]);
-      setTimeout(() => { setTermLines(p => [...p, { text: 'postgres-db', isSuccess: true }]); setContainer(null); }, 300);
-    }, 3000));
+      schedule(() => { setTermLines(p => [...p, { text: 'postgres-db', isSuccess: true }]); setContainer(null); }, 300);
+    }, 3000);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker run -d -v pgdata:/var/lib/postgresql/data --name postgres-db-v2 postgres:16', isCmd: true }]);
-      setTimeout(() => { setTermLines(p => [...p, { text: 'e5f6g7h8' }]); setContainer('postgres-db-v2'); }, 300);
-      setTimeout(() => setTermLines(p => [...p, { text: '$ docker exec postgres-db-v2 psql -c "SELECT * FROM users;"', isCmd: true }]), 500);
-      setTimeout(() => setTermLines(p => [...p, { text: ' id | name\n ---+------\n  1 | Alice\n  2 | Bob' }]), 700);
-      setTimeout(() => setTermLines(p => [...p, { text: '✓ Data survived container deletion and upgrade!', isSuccess: true }]), 900);
-    }, 3700));
+      schedule(() => { setTermLines(p => [...p, { text: 'e5f6g7h8' }]); setContainer('postgres-db-v2'); }, 300);
+      schedule(() => setTermLines(p => [...p, { text: '$ docker exec postgres-db-v2 psql -c "SELECT * FROM users;"', isCmd: true }]), 500);
+      schedule(() => setTermLines(p => [...p, { text: ' id | name\n ---+------\n  1 | Alice\n  2 | Bob' }]), 700);
+      schedule(() => setTermLines(p => [...p, { text: '✓ Data survived container deletion and upgrade!', isSuccess: true }]), 900);
+    }, 3700);
 
-    t.push(setTimeout(onDone, 5000));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 5000);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -375,20 +375,19 @@ const AnimNamedVolumes = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 3: Bind Mounts ────────────────────────────────────────────────
 
-const AnimBindMounts = ({ onDone }: { onDone: () => void }) => {
+const AnimBindMounts = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [editFlash, setEditFlash] = useState(false);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 700),
-      setTimeout(() => setPhase(2), 1300),
-      setTimeout(() => { setPhase(3); setEditFlash(true); setTimeout(() => setEditFlash(false), 600); }, 2000),
-      setTimeout(() => setPhase(4), 2700),
-      setTimeout(onDone, 3500),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 700);
+    schedule(() => setPhase(2), 1300);
+    schedule(() => { setPhase(3); setEditFlash(true); schedule(() => setEditFlash(false), 600); }, 2000);
+    schedule(() => setPhase(4), 2700);
+    schedule(onDone, 3500);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const HOST_FILES = ['server.js', 'package.json', 'src/'];
   const COMPARISON = [
@@ -487,7 +486,7 @@ const AnimBindMounts = ({ onDone }: { onDone: () => void }) => {
 
 interface VolRow { name: string; status: 'available' | 'in-use'; error?: boolean }
 
-const AnimVolumeCmds = ({ onDone }: { onDone: () => void }) => {
+const AnimVolumeCmds = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [termLines, setTermLines] = useState<{ text: string; isCmd?: boolean; isSuccess?: boolean; isError?: boolean }[]>([]);
   const [volumes, setVolumes] = useState<VolRow[]>([
     { name: 'appdata', status: 'in-use' },
@@ -496,59 +495,59 @@ const AnimVolumeCmds = ({ onDone }: { onDone: () => void }) => {
   ]);
   const [step, setStep] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [termLines.length]);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-    t.push(setTimeout(() => {
+    schedule(() => {
       setStep(1);
       setTermLines(p => [...p, { text: '$ docker volume ls', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'DRIVER    VOLUME NAME' }]), 150);
-      setTimeout(() => setTermLines(p => [...p, { text: 'local     appdata\nlocal     cachedata\nlocal     dbdata' }]), 300);
-    }, 200));
+      schedule(() => setTermLines(p => [...p, { text: 'DRIVER    VOLUME NAME' }]), 150);
+      schedule(() => setTermLines(p => [...p, { text: 'local     appdata\nlocal     cachedata\nlocal     dbdata' }]), 300);
+    }, 200);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setStep(2);
       setTermLines(p => [...p, { text: '$ docker volume create --name myvolume', isCmd: true }]);
-      setTimeout(() => { setTermLines(p => [...p, { text: 'myvolume', isSuccess: true }]); setVolumes(prev => [...prev, { name: 'myvolume', status: 'available' }]); }, 200);
-      setTimeout(() => setTermLines(p => [...p, { text: '$ docker volume inspect myvolume', isCmd: true }]), 400);
-      setTimeout(() => setTermLines(p => [...p, { text: '  Mountpoint: /var/lib/docker/volumes/myvolume/_data' }]), 600);
-    }, 900));
+      schedule(() => { setTermLines(p => [...p, { text: 'myvolume', isSuccess: true }]); setVolumes(prev => [...prev, { name: 'myvolume', status: 'available' }]); }, 200);
+      schedule(() => setTermLines(p => [...p, { text: '$ docker volume inspect myvolume', isCmd: true }]), 400);
+      schedule(() => setTermLines(p => [...p, { text: '  Mountpoint: /var/lib/docker/volumes/myvolume/_data' }]), 600);
+    }, 900);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setStep(3);
       setTermLines(p => [...p, { text: '$ docker run -d --name app1 -v myvolume:/data alpine sleep 3600', isCmd: true }]);
-      setTimeout(() => { setTermLines(p => [...p, { text: 'a1b2c3' }]); setVolumes(prev => prev.map(v => v.name === 'myvolume' ? { ...v, status: 'in-use' } : v)); }, 250);
-    }, 2000));
+      schedule(() => { setTermLines(p => [...p, { text: 'a1b2c3' }]); setVolumes(prev => prev.map(v => v.name === 'myvolume' ? { ...v, status: 'in-use' } : v)); }, 250);
+    }, 2000);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setStep(4);
       setTermLines(p => [...p, { text: '$ docker volume rm cachedata', isCmd: true }]);
-      setTimeout(() => {
+      schedule(() => {
         setTermLines(p => [...p, { text: 'Error: volume is in use', isError: true }]);
         setVolumes(prev => prev.map(v => v.name === 'cachedata' ? { ...v, error: true } : v));
-        setTimeout(() => setVolumes(prev => prev.map(v => ({ ...v, error: false }))), 800);
+        schedule(() => setVolumes(prev => prev.map(v => ({ ...v, error: false }))), 800);
       }, 200);
-      setTimeout(() => setTermLines(p => [...p, { text: '$ docker stop app1 && docker rm app1', isCmd: true }]), 500);
-      setTimeout(() => {
+      schedule(() => setTermLines(p => [...p, { text: '$ docker stop app1 && docker rm app1', isCmd: true }]), 500);
+      schedule(() => {
         setTermLines(p => [...p, { text: '$ docker volume rm cachedata', isCmd: true }]);
-        setTimeout(() => { setTermLines(p => [...p, { text: 'cachedata', isSuccess: true }]); setVolumes(prev => prev.filter(v => v.name !== 'cachedata')); }, 200);
+        schedule(() => { setTermLines(p => [...p, { text: 'cachedata', isSuccess: true }]); setVolumes(prev => prev.filter(v => v.name !== 'cachedata')); }, 200);
       }, 800);
-    }, 2800));
+    }, 2800);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setStep(5);
       setTermLines(p => [...p, { text: '$ docker volume prune', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'WARNING: This will remove all unused volumes.' }]), 200);
-      setTimeout(() => {
+      schedule(() => setTermLines(p => [...p, { text: 'WARNING: This will remove all unused volumes.' }]), 200);
+      schedule(() => {
         setTermLines(p => [...p, { text: 'Deleted Volumes: myvolume\nTotal reclaimed space: 125MB', isSuccess: true }]);
         setVolumes(prev => prev.filter(v => v.status === 'in-use'));
       }, 500);
-    }, 3700));
+    }, 3700);
 
-    t.push(setTimeout(onDone, 4500));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 4500);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -605,19 +604,18 @@ const AnimVolumeCmds = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 5: Real-World Patterns ────────────────────────────────────────
 
-const AnimPatterns = ({ onDone }: { onDone: () => void }) => {
+const AnimPatterns = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [pattern, setPattern] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPattern(1), 0),
-      setTimeout(() => setPattern(2), 1800),
-      setTimeout(() => setPattern(3), 3300),
-      setTimeout(() => setPattern(4), 4800),
-      setTimeout(onDone, 5600),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPattern(1), 0);
+    schedule(() => setPattern(2), 1800);
+    schedule(() => setPattern(3), 3300);
+    schedule(() => setPattern(4), 4800);
+    schedule(onDone, 5600);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4 gap-2 overflow-hidden relative">
@@ -735,7 +733,9 @@ const Level9Interactive = () => {
   const [infoLines, setInfoLines] = useState<{ text: string; type: 'cmd' | 'output' }[]>([]);
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
+  const [paused, setPaused] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+  const logTimers = usePausableTimers(paused);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -743,12 +743,13 @@ const Level9Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
     const log = INFO_LOGS[id];
     const allLines = [{ text: log.prefix, type: 'cmd' as const }, ...log.lines.map(l => ({ text: l, type: 'output' as const }))];
-    allLines.forEach((line, i) => { setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120); });
-  }, [animating]);
+    allLines.forEach((line, i) => { logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120); });
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -758,9 +759,9 @@ const Level9Interactive = () => {
     setCompleted(next);
     setAnimating(false);
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(9)) completeLevel(9);
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(9)) completeLevel(9);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -829,15 +830,23 @@ const Level9Interactive = () => {
                     <span className="text-xs font-mono" style={{ color: TOPICS.find(t => t.id === active)!.color }}>{TOPICS.find(t => t.id === active)!.label}</span>
                   </div>
                   <div className="absolute inset-0 pt-8">
-                    {active === 'data-loss' && <AnimDataLoss onDone={handleAnimDone} />}
-                    {active === 'named-volumes' && <AnimNamedVolumes onDone={handleAnimDone} />}
-                    {active === 'bind-mounts' && <AnimBindMounts onDone={handleAnimDone} />}
-                    {active === 'volume-cmds' && <AnimVolumeCmds onDone={handleAnimDone} />}
-                    {active === 'patterns' && <AnimPatterns onDone={handleAnimDone} />}
+                    {active === 'data-loss' && <AnimDataLoss onDone={handleAnimDone} paused={paused} />}
+                    {active === 'named-volumes' && <AnimNamedVolumes onDone={handleAnimDone} paused={paused} />}
+                    {active === 'bind-mounts' && <AnimBindMounts onDone={handleAnimDone} paused={paused} />}
+                    {active === 'volume-cmds' && <AnimVolumeCmds onDone={handleAnimDone} paused={paused} />}
+                    {active === 'patterns' && <AnimPatterns onDone={handleAnimDone} paused={paused} />}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           <div className="shrink-0 border-t border-border" style={{ height: 200 }}>

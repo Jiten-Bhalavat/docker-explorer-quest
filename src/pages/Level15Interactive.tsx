@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'architecture' | 'pipeline' | 'request' | 'failure' | 'together';
 
@@ -184,20 +185,20 @@ const ArchNode = ({ name, sub, color, badges, delay = 0, replicas }: { name: str
 
 // ─── Animation 1: Full Architecture ──────────────────────────────────────────
 
-const AnimArchitecture = ({ onDone }: { onDone: () => void }) => {
+const AnimArchitecture = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-    t.push(setTimeout(() => setPhase(1), 300));
-    t.push(setTimeout(() => setPhase(2), 900));
-    t.push(setTimeout(() => setPhase(3), 1800));
-    t.push(setTimeout(() => setPhase(4), 3000));
-    t.push(setTimeout(() => setPhase(5), 4000));
-    t.push(setTimeout(() => setPhase(6), 4800));
-    t.push(setTimeout(onDone, 5600));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 300);
+    schedule(() => setPhase(2), 900);
+    schedule(() => setPhase(3), 1800);
+    schedule(() => setPhase(4), 3000);
+    schedule(() => setPhase(5), 4000);
+    schedule(() => setPhase(6), 4800);
+    schedule(onDone, 5600);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col items-center p-3 gap-2 overflow-y-auto">
@@ -308,29 +309,29 @@ const STATIONS = [
   { icon: '🌍', label: 'Production', color: '#10B981' },
 ];
 
-const AnimPipeline = ({ onDone }: { onDone: () => void }) => {
+const AnimPipeline = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [trainPos, setTrainPos] = useState(0);
   const [phase, setPhase] = useState(0);
   const [rollback, setRollback] = useState(false);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
     let delay = 400;
     for (let i = 1; i <= 7; i++) {
       const d = delay;
-      t.push(setTimeout(() => setTrainPos(i), d));
+      schedule(() => setTrainPos(i), d);
       delay += i === 2 ? 600 : i === 5 ? 500 : 350;
     }
-    t.push(setTimeout(() => setPhase(1), delay));
+    schedule(() => setPhase(1), delay);
 
     // Rollback
-    t.push(setTimeout(() => { setRollback(true); setPhase(2); }, delay + 600));
-    t.push(setTimeout(() => setTrainPos(5), delay + 900));
-    t.push(setTimeout(() => { setTrainPos(7); setPhase(3); }, delay + 1500));
-    t.push(setTimeout(() => setPhase(4), delay + 2200));
-    t.push(setTimeout(onDone, delay + 2800));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => { setRollback(true); setPhase(2); }, delay + 600);
+    schedule(() => setTrainPos(5), delay + 900);
+    schedule(() => { setTrainPos(7); setPhase(3); }, delay + 1500);
+    schedule(() => setPhase(4), delay + 2200);
+    schedule(onDone, delay + 2800);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col p-3 gap-3 overflow-y-auto">
@@ -409,18 +410,18 @@ const REQ_STEPS = [
   { node: 'Browser', action: '200 OK — 20ms total', color: '#8B5CF6' },
 ];
 
-const AnimRequest = ({ onDone }: { onDone: () => void }) => {
+const AnimRequest = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [step, setStep] = useState(-1);
   const [cached, setCached] = useState(false);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
     let d = 300;
-    for (let i = 0; i < REQ_STEPS.length; i++) { const dd = d; t.push(setTimeout(() => setStep(i), dd)); d += 350; }
-    t.push(setTimeout(() => { setCached(true); setStep(10); }, d + 200));
-    t.push(setTimeout(onDone, d + 1200));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    for (let i = 0; i < REQ_STEPS.length; i++) { const dd = d; schedule(() => setStep(i), dd); d += 350; }
+    schedule(() => { setCached(true); setStep(10); }, d + 200);
+    schedule(onDone, d + 1200);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col p-3 gap-1.5 overflow-y-auto">
@@ -475,26 +476,26 @@ const SCENARIOS: Scenario[] = [
   { title: 'Traffic Spike', fail: '📈 10× normal load — CPU 95%', recover: 'Scale 2→6 replicas → load distributed', badge: 'L14', badgeColor: '#F59E0B', time: '15s' },
 ];
 
-const AnimFailure = ({ onDone }: { onDone: () => void }) => {
+const AnimFailure = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [scenIdx, setScenIdx] = useState(-1);
   const [recovering, setRecovering] = useState(false);
   const [recovered, setRecovered] = useState<Set<number>>(new Set());
   const [showSummary, setShowSummary] = useState(false);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
     let d = 200;
     for (let i = 0; i < 4; i++) {
       const dd = d;
-      t.push(setTimeout(() => { setScenIdx(i); setRecovering(false); }, dd));
-      t.push(setTimeout(() => setRecovering(true), dd + 600));
-      t.push(setTimeout(() => setRecovered(p => new Set(p).add(i)), dd + 1100));
+      schedule(() => { setScenIdx(i); setRecovering(false); }, dd);
+      schedule(() => setRecovering(true), dd + 600);
+      schedule(() => setRecovered(p => new Set(p).add(i)), dd + 1100);
       d += 1500;
     }
-    t.push(setTimeout(() => setShowSummary(true), d));
-    t.push(setTimeout(onDone, d + 700));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setShowSummary(true), d);
+    schedule(onDone, d + 700);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col p-3 gap-2 overflow-y-auto">
@@ -569,44 +570,44 @@ const CONSTELLATION_LINKS = [
   [13, 15], [14, 15], [11, 15],
 ];
 
-const AnimTogether = ({ onDone }: { onDone: () => void }) => {
+const AnimTogether = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [visibleNodes, setVisibleNodes] = useState(0);
   const [showLinks, setShowLinks] = useState(false);
   const [showText, setShowText] = useState(0);
   const [typedCmd, setTypedCmd] = useState('');
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   const fullCmd = '$ docker run -d --name future jiten/docker-engineer:v1.0.0 ✓';
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
     // Phase 0 → constellation appears
     let d = 300;
-    for (let i = 1; i <= 15; i++) { const dd = d; t.push(setTimeout(() => setVisibleNodes(i), dd)); d += 150; }
+    for (let i = 1; i <= 15; i++) { const dd = d; schedule(() => setVisibleNodes(i), dd); d += 150; }
 
     // Phase 1 → links
-    t.push(setTimeout(() => { setShowLinks(true); setPhase(1); }, d + 200));
+    schedule(() => { setShowLinks(true); setPhase(1); }, d + 200);
 
     // Phase 2 → all glow gold
-    t.push(setTimeout(() => setPhase(2), d + 800));
+    schedule(() => setPhase(2), d + 800);
 
     // Phase 3 → text overlay
-    t.push(setTimeout(() => { setPhase(3); setShowText(1); }, d + 1500));
-    t.push(setTimeout(() => setShowText(2), d + 1900));
-    t.push(setTimeout(() => setShowText(3), d + 2300));
-    t.push(setTimeout(() => setShowText(4), d + 2700));
+    schedule(() => { setPhase(3); setShowText(1); }, d + 1500);
+    schedule(() => setShowText(2), d + 1900);
+    schedule(() => setShowText(3), d + 2300);
+    schedule(() => setShowText(4), d + 2700);
 
     // Phase 4 → typed command
     const cmdStart = d + 3200;
     for (let i = 0; i <= fullCmd.length; i++) {
       const dd = cmdStart + i * 30;
-      t.push(setTimeout(() => setTypedCmd(fullCmd.slice(0, i)), dd));
+      schedule(() => setTypedCmd(fullCmd.slice(0, i)), dd);
     }
 
-    t.push(setTimeout(() => setPhase(4), cmdStart + fullCmd.length * 30 + 300));
-    t.push(setTimeout(onDone, cmdStart + fullCmd.length * 30 + 1000));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(4), cmdStart + fullCmd.length * 30 + 300);
+    schedule(onDone, cmdStart + fullCmd.length * 30 + 1000);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const nodePositions = useMemo(() => {
     const cx = 160, cy = 110, r = 85;
@@ -895,6 +896,8 @@ const Level15Interactive = () => {
   const [localXP, setLocalXP] = useState(0);
   const [showGraduation, setShowGraduation] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+  const [paused, setPaused] = useState(false);
+  const logTimers = usePausableTimers(paused);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -902,12 +905,13 @@ const Level15Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
     const log = INFO_LOGS[id];
     const allLines = [{ text: log.prefix, type: 'cmd' as const }, ...log.lines.map(l => ({ text: l, type: 'output' as const }))];
-    allLines.forEach((line, i) => { setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120); });
-  }, [animating]);
+    allLines.forEach((line, i) => { logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120); });
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -917,8 +921,8 @@ const Level15Interactive = () => {
     setCompleted(next);
     setAnimating(false);
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(15)) completeLevel(15);
     if (next.size === 5) {
-      if (!completedLevels.includes(15)) completeLevel(15);
       setTimeout(() => setShowGraduation(true), 400);
     }
   }, [active, completed, completedLevels, completeLevel]);
@@ -997,15 +1001,23 @@ const Level15Interactive = () => {
                     <span className="text-xs font-mono" style={{ color: TOPICS.find(t => t.id === active)!.color }}>{TOPICS.find(t => t.id === active)!.label}</span>
                   </div>
                   <div className="absolute inset-0 pt-8">
-                    {active === 'architecture' && <AnimArchitecture onDone={handleAnimDone} />}
-                    {active === 'pipeline' && <AnimPipeline onDone={handleAnimDone} />}
-                    {active === 'request' && <AnimRequest onDone={handleAnimDone} />}
-                    {active === 'failure' && <AnimFailure onDone={handleAnimDone} />}
-                    {active === 'together' && <AnimTogether onDone={handleAnimDone} />}
+                    {active === 'architecture' && <AnimArchitecture onDone={handleAnimDone} paused={paused} />}
+                    {active === 'pipeline' && <AnimPipeline onDone={handleAnimDone} paused={paused} />}
+                    {active === 'request' && <AnimRequest onDone={handleAnimDone} paused={paused} />}
+                    {active === 'failure' && <AnimFailure onDone={handleAnimDone} paused={paused} />}
+                    {active === 'together' && <AnimTogether onDone={handleAnimDone} paused={paused} />}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           {/* Terminal log */}

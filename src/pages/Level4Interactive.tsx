@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'what-is-image' | 'layers' | 'docker-hub' | 'tags' | 'managing';
 
@@ -144,8 +145,9 @@ const CARD_DATA: Record<TopicId, { heading: string; sections: CardSection[] }> =
 
 // ─── Animation 1: What is a Docker Image ─────────────────────────────────────
 
-const AnimWhatIsImage = ({ onDone }: { onDone: () => void }) => {
-  useEffect(() => { const t = setTimeout(onDone, 3200); return () => clearTimeout(t); }, [onDone]);
+const AnimWhatIsImage = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
+  const { schedule, clearAll } = usePausableTimers(paused);
+  useEffect(() => { schedule(onDone, 3200); return clearAll; }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4 gap-3">
@@ -224,8 +226,9 @@ const LAYERS = [
   { label: 'Layer 5: Config', detail: 'CMD node server.js', icon: '▶️', size: '1 KB', type: 'CMD metadata', bg: '#3E2080' },
 ];
 
-const AnimLayers = ({ onDone }: { onDone: () => void }) => {
-  useEffect(() => { const t = setTimeout(onDone, 3600); return () => clearTimeout(t); }, [onDone]);
+const AnimLayers = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
+  const { schedule, clearAll } = usePausableTimers(paused);
+  useEffect(() => { schedule(onDone, 3600); return clearAll; }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4">
@@ -303,18 +306,17 @@ const HUB_IMAGES = [
   { name: 'python', pulls: '600M+' },
 ];
 
-const AnimDockerHub = ({ onDone }: { onDone: () => void }) => {
+const AnimDockerHub = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 1200),
-      setTimeout(() => setPhase(2), 1800),
-      setTimeout(() => setPhase(3), 2400),
-      setTimeout(onDone, 3200),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 1200);
+    schedule(() => setPhase(2), 1800);
+    schedule(() => setPhase(3), 2400);
+    schedule(onDone, 3200);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4 gap-3">
@@ -388,19 +390,18 @@ const TAG_ROWS = [
   { tag: 'alpine', note: 'lightweight — only 23 MB!', special: true },
 ];
 
-const AnimTags = ({ onDone }: { onDone: () => void }) => {
+const AnimTags = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 500),
-      setTimeout(() => setPhase(2), 1400),
-      setTimeout(() => setPhase(3), 2000),
-      setTimeout(() => setPhase(4), 2500),
-      setTimeout(onDone, 3200),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 500);
+    schedule(() => setPhase(2), 1400);
+    schedule(() => setPhase(3), 2000);
+    schedule(() => setPhase(4), 2500);
+    schedule(onDone, 3200);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4 gap-3 overflow-hidden">
@@ -553,45 +554,46 @@ const INITIAL_STORE = [
   { name: 'node', tag: '18', size: '340 MB' },
 ];
 
-const AnimManaging = ({ onDone }: { onDone: () => void }) => {
+const AnimManaging = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [stepIdx, setStepIdx] = useState(-1);
   const [visibleLines, setVisibleLines] = useState<TermLine[]>([]);
   const [store, setStore] = useState(INITIAL_STORE);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [newBadge, setNewBadge] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
     const stepDelays = [400, 1100, 2000, 2800, 3500];
-    const timers = stepDelays.map((d, i) => setTimeout(() => setStepIdx(i), d));
-    timers.push(setTimeout(onDone, 4200));
-    return () => timers.forEach(clearTimeout);
-  }, [onDone]);
+    stepDelays.forEach((d, i) => schedule(() => setStepIdx(i), d));
+    schedule(onDone, 4200);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   useEffect(() => {
     if (stepIdx < 0) return;
     const step = MGMT_STEPS[stepIdx];
     step.lines.forEach((line, i) => {
-      setTimeout(() => setVisibleLines(prev => [...prev, line]), i * 100);
+      schedule(() => setVisibleLines(prev => [...prev, line]), i * 100);
     });
 
     const afterLines = step.lines.length * 100 + 50;
-    const timer = setTimeout(() => {
+    schedule(() => {
       if (step.storeAction === 'list') setHighlight('all');
       else if (step.storeAction === 'add' && step.storeTarget) {
         setStore(prev => [...prev, { name: step.storeTarget!.split(':')[0], tag: step.storeTarget!.split(':')[1] || 'latest', size: '45 MB' }]);
         setNewBadge(step.storeTarget!.split(':')[0]);
-        setTimeout(() => setNewBadge(null), 1200);
+        schedule(() => setNewBadge(null), 1200);
       } else if (step.storeAction === 'inspect' && step.storeTarget) {
         setHighlight(step.storeTarget);
       } else if (step.storeAction === 'remove' && step.storeTarget) {
         setStore(prev => prev.filter(img => img.name !== step.storeTarget));
       }
-      setTimeout(() => setHighlight(null), 600);
+      schedule(() => setHighlight(null), 600);
     }, afterLines);
 
-    return () => clearTimeout(timer);
-  }, [stepIdx]);
+    return clearAll;
+  }, [stepIdx, schedule, clearAll]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -668,6 +670,8 @@ const Level4Interactive = () => {
   const [infoLines, setInfoLines] = useState<{ text: string; type: 'cmd' | 'output' }[]>([]);
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const logTimers = usePausableTimers(paused);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -676,6 +680,7 @@ const Level4Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
 
@@ -685,9 +690,9 @@ const Level4Interactive = () => {
       ...log.lines.map(l => ({ text: l, type: 'output' as const })),
     ];
     allLines.forEach((line, i) => {
-      setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120);
+      logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120);
     });
-  }, [animating]);
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -698,10 +703,10 @@ const Level4Interactive = () => {
     setAnimating(false);
 
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(4)) completeLevel(4);
 
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(4)) completeLevel(4);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -791,14 +796,22 @@ const Level4Interactive = () => {
                       {TOPICS.find(t => t.id === active)!.label}
                     </span>
                   </div>
-                  {active === 'what-is-image' && <AnimWhatIsImage onDone={handleAnimDone} />}
-                  {active === 'layers' && <AnimLayers onDone={handleAnimDone} />}
-                  {active === 'docker-hub' && <AnimDockerHub onDone={handleAnimDone} />}
-                  {active === 'tags' && <AnimTags onDone={handleAnimDone} />}
-                  {active === 'managing' && <AnimManaging onDone={handleAnimDone} />}
+                  {active === 'what-is-image' && <AnimWhatIsImage onDone={handleAnimDone} paused={paused} />}
+                  {active === 'layers' && <AnimLayers onDone={handleAnimDone} paused={paused} />}
+                  {active === 'docker-hub' && <AnimDockerHub onDone={handleAnimDone} paused={paused} />}
+                  {active === 'tags' && <AnimTags onDone={handleAnimDone} paused={paused} />}
+                  {active === 'managing' && <AnimManaging onDone={handleAnimDone} paused={paused} />}
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           {/* Image Log */}

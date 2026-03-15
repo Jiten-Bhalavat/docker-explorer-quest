@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'image-to-container' | 'writable-layer' | 'port-mapping' | 'detached' | 'commands';
 
@@ -143,19 +144,18 @@ const CARD_DATA: Record<TopicId, { heading: string; sections: CardSection[] }> =
 
 // ─── Animation 1: Image to Container ─────────────────────────────────────────
 
-const AnimImageToContainer = ({ onDone }: { onDone: () => void }) => {
+const AnimImageToContainer = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 700),
-      setTimeout(() => setPhase(2), 1400),
-      setTimeout(() => setPhase(3), 2100),
-      setTimeout(() => setPhase(4), 2800),
-      setTimeout(onDone, 3500),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 700);
+    schedule(() => setPhase(2), 1400);
+    schedule(() => setPhase(3), 2100);
+    schedule(() => setPhase(4), 2800);
+    schedule(onDone, 3500);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const IMAGE_LAYERS = [
     { label: 'CMD node server.js', color: '#374151' },
@@ -258,19 +258,18 @@ const AnimImageToContainer = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 2: Writable Layer ─────────────────────────────────────────────
 
-const AnimWritableLayer = ({ onDone }: { onDone: () => void }) => {
+const AnimWritableLayer = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 600),
-      setTimeout(() => setPhase(2), 1500),
-      setTimeout(() => setPhase(3), 2100),
-      setTimeout(() => setPhase(4), 2700),
-      setTimeout(onDone, 3500),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 600);
+    schedule(() => setPhase(2), 1500);
+    schedule(() => setPhase(3), 2100);
+    schedule(() => setPhase(4), 2700);
+    schedule(onDone, 3500);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const WRITES = [
     { icon: '📄', label: 'Logs → /var/log/app.log', delay: 0 },
@@ -373,19 +372,18 @@ const AnimWritableLayer = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 3: Port Mapping ───────────────────────────────────────────────
 
-const AnimPortMapping = ({ onDone }: { onDone: () => void }) => {
+const AnimPortMapping = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 700),
-      setTimeout(() => setPhase(2), 1300),
-      setTimeout(() => setPhase(3), 2000),
-      setTimeout(() => setPhase(4), 2600),
-      setTimeout(onDone, 3400),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 700);
+    schedule(() => setPhase(2), 1300);
+    schedule(() => setPhase(3), 2000);
+    schedule(() => setPhase(4), 2600);
+    schedule(onDone, 3400);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4 gap-3">
@@ -474,19 +472,18 @@ const AnimPortMapping = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 4: Detached Mode ──────────────────────────────────────────────
 
-const AnimDetached = ({ onDone }: { onDone: () => void }) => {
+const AnimDetached = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 500),
-      setTimeout(() => setPhase(2), 1000),
-      setTimeout(() => setPhase(3), 1700),
-      setTimeout(() => setPhase(4), 2400),
-      setTimeout(onDone, 3200),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 500);
+    schedule(() => setPhase(2), 1000);
+    schedule(() => setPhase(3), 1700);
+    schedule(() => setPhase(4), 2400);
+    schedule(onDone, 3200);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-3 gap-2 overflow-hidden">
@@ -640,27 +637,28 @@ const STATE_CONFIG: Record<CState, { border: string; bg: string; badge: string; 
   removed: { border: '#374151', bg: '#11182700', badge: '✕ REMOVED', badgeColor: '#6B7280', icon: '' },
 };
 
-const AnimCommands = ({ onDone }: { onDone: () => void }) => {
+const AnimCommands = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [stepIdx, setStepIdx] = useState(-1);
   const [visibleLines, setVisibleLines] = useState<TermLine[]>([]);
   const [cState, setCState] = useState<CState>('none');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
     const delays = [300, 1100, 2000, 2700, 3300];
-    const timers = delays.map((d, i) => setTimeout(() => setStepIdx(i), d));
-    timers.push(setTimeout(onDone, 4000));
-    return () => timers.forEach(clearTimeout);
-  }, [onDone]);
+    delays.forEach((d, i) => schedule(() => setStepIdx(i), d));
+    schedule(onDone, 4000);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   useEffect(() => {
     if (stepIdx < 0) return;
     const step = CMD_STEPS[stepIdx];
     step.lines.forEach((line, i) => {
-      setTimeout(() => setVisibleLines(prev => [...prev, line]), i * 100);
+      schedule(() => setVisibleLines(prev => [...prev, line]), i * 100);
     });
-    setTimeout(() => setCState(step.state), step.lines.length * 100 + 50);
-  }, [stepIdx]);
+    schedule(() => setCState(step.state), step.lines.length * 100 + 50);
+  }, [stepIdx, schedule]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -746,6 +744,8 @@ const Level5Interactive = () => {
   const [infoLines, setInfoLines] = useState<{ text: string; type: 'cmd' | 'output' }[]>([]);
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const logTimers = usePausableTimers(paused);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -754,12 +754,13 @@ const Level5Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
     const log = INFO_LOGS[id];
     const allLines = [{ text: log.prefix, type: 'cmd' as const }, ...log.lines.map(l => ({ text: l, type: 'output' as const }))];
-    allLines.forEach((line, i) => { setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120); });
-  }, [animating]);
+    allLines.forEach((line, i) => { logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120); });
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -769,7 +770,8 @@ const Level5Interactive = () => {
     setCompleted(next);
     setAnimating(false);
     if (wasNew) setLocalXP(prev => prev + 20);
-    if (next.size === 5 && !levelDone) { setLevelDone(true); if (!completedLevels.includes(5)) completeLevel(5); }
+    if (wasNew && !completedLevels.includes(5)) completeLevel(5);
+    if (next.size === 5 && !levelDone) { setLevelDone(true); }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
   const animKey = active ? `${active}-${Date.now()}` : '';
@@ -842,14 +844,22 @@ const Level5Interactive = () => {
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TOPICS.find(t => t.id === active)!.color }} />
                     <span className="text-xs font-mono" style={{ color: TOPICS.find(t => t.id === active)!.color }}>{TOPICS.find(t => t.id === active)!.label}</span>
                   </div>
-                  {active === 'image-to-container' && <AnimImageToContainer onDone={handleAnimDone} />}
-                  {active === 'writable-layer' && <AnimWritableLayer onDone={handleAnimDone} />}
-                  {active === 'port-mapping' && <AnimPortMapping onDone={handleAnimDone} />}
-                  {active === 'detached' && <AnimDetached onDone={handleAnimDone} />}
-                  {active === 'commands' && <AnimCommands onDone={handleAnimDone} />}
+                  {active === 'image-to-container' && <AnimImageToContainer onDone={handleAnimDone} paused={paused} />}
+                  {active === 'writable-layer' && <AnimWritableLayer onDone={handleAnimDone} paused={paused} />}
+                  {active === 'port-mapping' && <AnimPortMapping onDone={handleAnimDone} paused={paused} />}
+                  {active === 'detached' && <AnimDetached onDone={handleAnimDone} paused={paused} />}
+                  {active === 'commands' && <AnimCommands onDone={handleAnimDone} paused={paused} />}
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           {/* Terminal Log */}

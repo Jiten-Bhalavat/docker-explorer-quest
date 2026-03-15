@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'drivers' | 'bridge' | 'user-defined' | 'dns' | 'net-cmds';
 
@@ -178,19 +179,18 @@ const Packet = ({ color, success, style }: { color: string; success: boolean; st
 
 // ─── Animation 1: Network Drivers ────────────────────────────────────────────
 
-const AnimDrivers = ({ onDone }: { onDone: () => void }) => {
+const AnimDrivers = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 400),
-      setTimeout(() => setPhase(2), 1800),
-      setTimeout(() => setPhase(3), 2400),
-      setTimeout(() => setPhase(4), 3000),
-      setTimeout(onDone, 3800),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 400);
+    schedule(() => setPhase(2), 1800);
+    schedule(() => setPhase(3), 2400);
+    schedule(() => setPhase(4), 3000);
+    schedule(onDone, 3800);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const columns: { title: string; color: string; desc: string; useCase: string; containers: { name: string; ip?: string }[]; packetResult: boolean }[] = [
     { title: 'BRIDGE', color: '#06B6D4', desc: 'Default. Isolated. NAT for external.', useCase: 'Web apps, microservices', containers: [{ name: 'A', ip: '172.17.0.2' }, { name: 'B', ip: '172.17.0.3' }, { name: 'C', ip: '172.17.0.4' }], packetResult: true },
@@ -279,19 +279,18 @@ const AnimDrivers = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 2: Bridge Network Deep Dive ───────────────────────────────────
 
-const AnimBridge = ({ onDone }: { onDone: () => void }) => {
+const AnimBridge = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 500),
-      setTimeout(() => setPhase(2), 1100),
-      setTimeout(() => setPhase(3), 1700),
-      setTimeout(() => setPhase(4), 2400),
-      setTimeout(onDone, 3200),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 500);
+    schedule(() => setPhase(2), 1100);
+    schedule(() => setPhase(3), 1700);
+    schedule(() => setPhase(4), 2400);
+    schedule(onDone, 3200);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col items-center p-4 gap-3 overflow-hidden">
@@ -384,19 +383,18 @@ const AnimBridge = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 3: User-Defined Networks ──────────────────────────────────────
 
-const AnimUserDefined = ({ onDone }: { onDone: () => void }) => {
+const AnimUserDefined = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 700),
-      setTimeout(() => setPhase(2), 1300),
-      setTimeout(() => setPhase(3), 2100),
-      setTimeout(() => setPhase(4), 2700),
-      setTimeout(onDone, 3500),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 700);
+    schedule(() => setPhase(2), 1300);
+    schedule(() => setPhase(3), 2100);
+    schedule(() => setPhase(4), 2700);
+    schedule(onDone, 3500);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const CONTAINERS = ['web', 'api', 'db'];
 
@@ -492,55 +490,55 @@ const AnimUserDefined = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 4: DNS & Service Discovery ────────────────────────────────────
 
-const AnimDNS = ({ onDone }: { onDone: () => void }) => {
+const AnimDNS = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [termLines, setTermLines] = useState<{ text: string; isCmd?: boolean; isSuccess?: boolean }[]>([]);
   const [dnsStep, setDnsStep] = useState(0);
   const [aliasName, setAliasName] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [termLines.length]);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker network create app-net', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: '9f8e7d6c5b4a' }]), 150);
-      setTimeout(() => setTermLines(p => [...p, { text: '$ docker run -d --name web --network app-net nginx', isCmd: true }]), 300);
-      setTimeout(() => setTermLines(p => [...p, { text: '$ docker run -d --name api --network app-net node:18-alpine', isCmd: true }]), 500);
-      setTimeout(() => setTermLines(p => [...p, { text: '$ docker run -d --name db  --network app-net postgres:15', isCmd: true }]), 700);
-      setTimeout(() => setDnsStep(1), 800);
-    }, 200));
+      schedule(() => setTermLines(p => [...p, { text: '9f8e7d6c5b4a' }]), 150);
+      schedule(() => setTermLines(p => [...p, { text: '$ docker run -d --name web --network app-net nginx', isCmd: true }]), 300);
+      schedule(() => setTermLines(p => [...p, { text: '$ docker run -d --name api --network app-net node:18-alpine', isCmd: true }]), 500);
+      schedule(() => setTermLines(p => [...p, { text: '$ docker run -d --name db  --network app-net postgres:15', isCmd: true }]), 700);
+      schedule(() => setDnsStep(1), 800);
+    }, 200);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setDnsStep(2);
       setTermLines(p => [...p, { text: '$ docker exec web ping -c 2 api', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'PING api (172.20.0.3): 56 data bytes' }]), 200);
-      setTimeout(() => setTermLines(p => [...p, { text: '64 bytes from 172.20.0.3: icmp_seq=0 time=0.142ms', isSuccess: true }]), 400);
-      setTimeout(() => setTermLines(p => [...p, { text: '64 bytes from 172.20.0.3: icmp_seq=1 time=0.089ms', isSuccess: true }]), 500);
-    }, 1200));
+      schedule(() => setTermLines(p => [...p, { text: 'PING api (172.20.0.3): 56 data bytes' }]), 200);
+      schedule(() => setTermLines(p => [...p, { text: '64 bytes from 172.20.0.3: icmp_seq=0 time=0.142ms', isSuccess: true }]), 400);
+      schedule(() => setTermLines(p => [...p, { text: '64 bytes from 172.20.0.3: icmp_seq=1 time=0.089ms', isSuccess: true }]), 500);
+    }, 1200);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setDnsStep(3);
       setTermLines(p => [...p, { text: '$ docker exec web curl http://api:3000/health', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: '{"status":"ok","service":"api"}', isSuccess: true }]), 250);
-    }, 2100));
+      schedule(() => setTermLines(p => [...p, { text: '{"status":"ok","service":"api"}', isSuccess: true }]), 250);
+    }, 2100);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setDnsStep(4);
       setTermLines(p => [...p, { text: '$ docker network inspect app-net', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: '  Subnet: 172.20.0.0/16' }]), 200);
-      setTimeout(() => setTermLines(p => [...p, { text: '  web: 172.20.0.2  api: 172.20.0.3  db: 172.20.0.4' }]), 350);
-    }, 2800));
+      schedule(() => setTermLines(p => [...p, { text: '  Subnet: 172.20.0.0/16' }]), 200);
+      schedule(() => setTermLines(p => [...p, { text: '  web: 172.20.0.2  api: 172.20.0.3  db: 172.20.0.4' }]), 350);
+    }, 2800);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setDnsStep(5);
       setTermLines(p => [...p, { text: '$ docker run -d --name db-primary --network app-net --network-alias database postgres:15', isCmd: true }]);
-      setTimeout(() => { setTermLines(p => [...p, { text: 'f1e2d3c4b5a6', isSuccess: true }]); setAliasName('database'); }, 250);
-    }, 3600));
+      schedule(() => { setTermLines(p => [...p, { text: 'f1e2d3c4b5a6', isSuccess: true }]); setAliasName('database'); }, 250);
+    }, 3600);
 
-    t.push(setTimeout(onDone, 4400));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 4400);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -626,22 +624,20 @@ const AnimDNS = ({ onDone }: { onDone: () => void }) => {
 interface NetNode { name: string; type: 'network' | 'container'; color: string; ip?: string }
 interface NetEdge { from: string; to: string }
 
-const AnimNetCmds = ({ onDone }: { onDone: () => void }) => {
+const AnimNetCmds = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [termLines, setTermLines] = useState<{ text: string; isCmd?: boolean; isSuccess?: boolean; isError?: boolean }[]>([]);
   const [nodes, setNodes] = useState<NetNode[]>([]);
   const [edges, setEdges] = useState<NetEdge[]>([]);
   const [errorNode, setErrorNode] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [termLines.length]);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-
-    // Step 1: docker network ls
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker network ls', isCmd: true }]);
-      setTimeout(() => {
+      schedule(() => {
         setTermLines(p => [...p, { text: 'NETWORK ID     NAME      DRIVER    SCOPE' }]);
         setTermLines(p => [...p, { text: 'a1b2c3d4e5f6   bridge    bridge    local\nb2c3d4e5f6a1   host      host      local\nc3d4e5f6a1b2   none      null      local' }]);
         setNodes([
@@ -650,71 +646,67 @@ const AnimNetCmds = ({ onDone }: { onDone: () => void }) => {
           { name: 'none', type: 'network', color: '#EF4444' },
         ]);
       }, 200);
-    }, 200));
+    }, 200);
 
-    // Step 2: create my-network
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker network create --driver bridge --subnet 192.168.100.0/24 my-network', isCmd: true }]);
-      setTimeout(() => {
+      schedule(() => {
         setTermLines(p => [...p, { text: 'd4e5f6a1b2c3', isSuccess: true }]);
         setNodes(prev => [...prev, { name: 'my-network', type: 'network', color: '#F59E0B' }]);
       }, 200);
-    }, 900));
+    }, 900);
 
-    // Step 3: run containers
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker run -d --name app1 --network my-network nginx', isCmd: true }]);
-      setTimeout(() => {
+      schedule(() => {
         setTermLines(p => [...p, { text: 'a1b2c3' }]);
         setNodes(prev => [...prev, { name: 'app1', type: 'container', color: '#F59E0B', ip: '192.168.100.2' }]);
         setEdges(prev => [...prev, { from: 'app1', to: 'my-network' }]);
       }, 200);
-      setTimeout(() => setTermLines(p => [...p, { text: '$ docker run -d --name app2 --network my-network redis', isCmd: true }]), 400);
-      setTimeout(() => {
+      schedule(() => setTermLines(p => [...p, { text: '$ docker run -d --name app2 --network my-network redis', isCmd: true }]), 400);
+      schedule(() => {
         setTermLines(p => [...p, { text: 'b2c3d4' }]);
         setNodes(prev => [...prev, { name: 'app2', type: 'container', color: '#F59E0B', ip: '192.168.100.3' }]);
         setEdges(prev => [...prev, { from: 'app2', to: 'my-network' }]);
       }, 600);
-    }, 1800));
+    }, 1800);
 
-    // Step 4: connect/disconnect
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker network connect my-network app3', isCmd: true }]);
-      setTimeout(() => {
+      schedule(() => {
         setNodes(prev => [...prev, { name: 'app3', type: 'container', color: '#06B6D4' }]);
         setEdges(prev => [...prev, { from: 'app3', to: 'my-network' }, { from: 'app3', to: 'bridge' }]);
       }, 200);
-      setTimeout(() => {
+      schedule(() => {
         setTermLines(p => [...p, { text: '$ docker network disconnect bridge app3', isCmd: true }]);
-        setTimeout(() => setEdges(prev => prev.filter(e => !(e.from === 'app3' && e.to === 'bridge'))), 200);
+        schedule(() => setEdges(prev => prev.filter(e => !(e.from === 'app3' && e.to === 'bridge'))), 200);
       }, 500);
-    }, 2600));
+    }, 2600);
 
-    // Step 5: inspect, rm, prune
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker network inspect my-network', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: '  app1: 192.168.100.2/24\n  app2: 192.168.100.3/24' }]), 200);
-      setTimeout(() => {
+      schedule(() => setTermLines(p => [...p, { text: '  app1: 192.168.100.2/24\n  app2: 192.168.100.3/24' }]), 200);
+      schedule(() => {
         setTermLines(p => [...p, { text: '$ docker network rm my-network', isCmd: true }]);
-        setTimeout(() => {
+        schedule(() => {
           setTermLines(p => [...p, { text: 'Error: network has active endpoints', isError: true }]);
           setErrorNode('my-network');
-          setTimeout(() => setErrorNode(''), 800);
+          schedule(() => setErrorNode(''), 800);
         }, 200);
       }, 500);
-      setTimeout(() => {
+      schedule(() => {
         setTermLines(p => [...p, { text: '$ docker network prune', isCmd: true }]);
-        setTimeout(() => {
+        schedule(() => {
           setTermLines(p => [...p, { text: 'Deleted Networks: my-network', isSuccess: true }]);
           setNodes(prev => prev.filter(n => n.name !== 'my-network' && n.name !== 'app1' && n.name !== 'app2' && n.name !== 'app3'));
           setEdges(prev => prev.filter(e => e.to !== 'my-network' && e.from !== 'app1' && e.from !== 'app2' && e.from !== 'app3'));
         }, 200);
       }, 1000);
-    }, 3400));
+    }, 3400);
 
-    t.push(setTimeout(onDone, 4800));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 4800);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -790,7 +782,9 @@ const Level10Interactive = () => {
   const [infoLines, setInfoLines] = useState<{ text: string; type: 'cmd' | 'output' }[]>([]);
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
+  const [paused, setPaused] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+  const logTimers = usePausableTimers(paused);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -798,12 +792,13 @@ const Level10Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
     const log = INFO_LOGS[id];
     const allLines = [{ text: log.prefix, type: 'cmd' as const }, ...log.lines.map(l => ({ text: l, type: 'output' as const }))];
-    allLines.forEach((line, i) => { setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120); });
-  }, [animating]);
+    allLines.forEach((line, i) => { logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120); });
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -813,9 +808,9 @@ const Level10Interactive = () => {
     setCompleted(next);
     setAnimating(false);
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(10)) completeLevel(10);
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(10)) completeLevel(10);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -890,15 +885,23 @@ const Level10Interactive = () => {
                     <span className="text-xs font-mono" style={{ color: TOPICS.find(t => t.id === active)!.color }}>{TOPICS.find(t => t.id === active)!.label}</span>
                   </div>
                   <div className="absolute inset-0 pt-8">
-                    {active === 'drivers' && <AnimDrivers onDone={handleAnimDone} />}
-                    {active === 'bridge' && <AnimBridge onDone={handleAnimDone} />}
-                    {active === 'user-defined' && <AnimUserDefined onDone={handleAnimDone} />}
-                    {active === 'dns' && <AnimDNS onDone={handleAnimDone} />}
-                    {active === 'net-cmds' && <AnimNetCmds onDone={handleAnimDone} />}
+                    {active === 'drivers' && <AnimDrivers onDone={handleAnimDone} paused={paused} />}
+                    {active === 'bridge' && <AnimBridge onDone={handleAnimDone} paused={paused} />}
+                    {active === 'user-defined' && <AnimUserDefined onDone={handleAnimDone} paused={paused} />}
+                    {active === 'dns' && <AnimDNS onDone={handleAnimDone} paused={paused} />}
+                    {active === 'net-cmds' && <AnimNetCmds onDone={handleAnimDone} paused={paused} />}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           {/* Terminal log */}

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'basics' | 'instructions' | 'layer-order' | 'multi-stage' | 'build';
 
@@ -202,21 +203,20 @@ const BASIC_DF = [
   'CMD ["node", "server.js"]',
 ];
 
-const AnimBasics = ({ onDone }: { onDone: () => void }) => {
+const AnimBasics = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [visibleLines, setVisibleLines] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 600),
-      ...BASIC_DF.map((_, i) => setTimeout(() => setVisibleLines(i + 1), 800 + i * 180)),
-      setTimeout(() => setPhase(2), 2200),
-      setTimeout(() => setPhase(3), 3000),
-      setTimeout(() => setPhase(4), 3600),
-      setTimeout(onDone, 4300),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 600);
+    BASIC_DF.forEach((_, i) => schedule(() => setVisibleLines(i + 1), 800 + i * 180));
+    schedule(() => setPhase(2), 2200);
+    schedule(() => setPhase(3), 3000);
+    schedule(() => setPhase(4), 3600);
+    schedule(onDone, 4300);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const ANNOTATIONS = [
     { line: 1, text: 'Base image — your starting point', color: '#06B6D4' },
@@ -303,14 +303,15 @@ const INSTR_DETAILS: InstrDetail[] = [
   { name: 'CMD', icon: '▶️', desc: 'Default command to run when a container starts. Only one CMD per Dockerfile. Use exec form.', example: 'CMD ["node", "server.js"]', color: '#10B981' },
 ];
 
-const AnimInstructions = ({ onDone }: { onDone: () => void }) => {
+const AnimInstructions = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [step, setStep] = useState(-1);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const timers = INSTR_DETAILS.map((_, i) => setTimeout(() => setStep(i), i * 900));
-    timers.push(setTimeout(onDone, INSTR_DETAILS.length * 900 + 500));
-    return () => timers.forEach(clearTimeout);
-  }, [onDone]);
+    INSTR_DETAILS.forEach((_, i) => schedule(() => setStep(i), i * 900));
+    schedule(onDone, INSTR_DETAILS.length * 900 + 500);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const detail = step >= 0 ? INSTR_DETAILS[step] : null;
 
@@ -380,25 +381,22 @@ const CacheBadge = ({ status }: { status: CacheStatus }) => {
   );
 };
 
-const AnimLayerOrder = ({ onDone }: { onDone: () => void }) => {
+const AnimLayerOrder = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [badCache, setBadCache] = useState<CacheStatus[]>(BAD_DF.map(() => 'none'));
   const [goodCache, setGoodCache] = useState<CacheStatus[]>(GOOD_DF.map(() => 'none'));
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 800),
-      setTimeout(() => setPhase(2), 1400),
-      // Bad: all miss after COPY . .
-      setTimeout(() => setBadCache(['hit', 'miss', 'miss', 'miss', 'miss']), 1500),
-      setTimeout(() => setPhase(3), 2400),
-      // Good: hit until COPY . .
-      setTimeout(() => setGoodCache(['hit', 'hit', 'hit', 'miss', 'miss', 'miss']), 2500),
-      setTimeout(() => setPhase(4), 3200),
-      setTimeout(onDone, 4000),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 800);
+    schedule(() => setPhase(2), 1400);
+    schedule(() => setBadCache(['hit', 'miss', 'miss', 'miss', 'miss']), 1500);
+    schedule(() => setPhase(3), 2400);
+    schedule(() => setGoodCache(['hit', 'hit', 'hit', 'miss', 'miss', 'miss']), 2500);
+    schedule(() => setPhase(4), 3200);
+    schedule(onDone, 4000);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col p-3 gap-2">
@@ -486,19 +484,18 @@ const AnimLayerOrder = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 4: Multi-Stage Builds ─────────────────────────────────────────
 
-const AnimMultiStage = ({ onDone }: { onDone: () => void }) => {
+const AnimMultiStage = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 800),
-      setTimeout(() => setPhase(2), 2200),
-      setTimeout(() => setPhase(3), 2900),
-      setTimeout(() => setPhase(4), 3500),
-      setTimeout(onDone, 4300),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 800);
+    schedule(() => setPhase(2), 2200);
+    schedule(() => setPhase(3), 2900);
+    schedule(() => setPhase(4), 3500);
+    schedule(onDone, 4300);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const STAGE1 = ['FROM node:18 AS builder', 'WORKDIR /app', 'COPY package*.json ./', 'RUN npm ci', 'COPY . .', 'RUN npm run build'];
   const STAGE2 = ['FROM node:18-alpine', 'WORKDIR /app', 'COPY --from=builder /app/dist ./', 'CMD ["node", "server.js"]'];
@@ -624,43 +621,43 @@ const BUILD_STEPS: { cmd: string; output: string[]; layer: BuildLayer }[] = [
   { cmd: 'Step 7/7 : CMD ["node", "server.js"]', output: [' ---> 7k8l9m0n1o2p'], layer: { step: 7, instruction: 'CMD', size: '0B', cached: false } },
 ];
 
-const AnimBuild = ({ onDone }: { onDone: () => void }) => {
+const AnimBuild = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [termLines, setTermLines] = useState<{ text: string; isCmd?: boolean; isSuccess?: boolean }[]>([]);
   const [layers, setLayers] = useState<BuildLayer[]>([]);
   const [done, setDone] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [termLines.length]);
 
   useEffect(() => {
-    const timers: ReturnType<typeof setTimeout>[] = [];
     let time = 0;
     BUILD_STEPS.forEach((s, idx) => {
-      const extra = idx === 4 ? 600 : 0; // npm install spinner
-      timers.push(setTimeout(() => {
+      const extra = idx === 4 ? 600 : 0;
+      schedule(() => {
         setTermLines(p => [...p, { text: s.cmd, isCmd: idx === 0 }]);
         if (idx === 4) setSpinning(true);
         s.output.forEach((line, j) => {
-          timers.push(setTimeout(() => {
+          schedule(() => {
             setTermLines(p => [...p, { text: line }]);
             if (idx === 4 && j === s.output.length - 1) setSpinning(false);
-          }, (j + 1) * 150 + extra));
+          }, (j + 1) * 150 + extra);
         });
         if (s.layer.step > 0) {
-          timers.push(setTimeout(() => setLayers(p => [...p, s.layer]), s.output.length * 150 + extra + 50));
+          schedule(() => setLayers(p => [...p, s.layer]), s.output.length * 150 + extra + 50);
         }
-      }, time));
+      }, time);
       time += 500 + extra;
     });
 
-    timers.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: 'Successfully built 7k8l9m0n1o2p', isSuccess: true }, { text: 'Successfully tagged my-node-app:latest ✓', isSuccess: true }]);
       setDone(true);
-    }, time + 200));
-    timers.push(setTimeout(onDone, time + 800));
-    return () => timers.forEach(clearTimeout);
-  }, [onDone]);
+    }, time + 200);
+    schedule(onDone, time + 800);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -731,6 +728,8 @@ const Level7Interactive = () => {
   const [infoLines, setInfoLines] = useState<{ text: string; type: 'cmd' | 'output' }[]>([]);
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const logTimers = usePausableTimers(paused);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -739,12 +738,13 @@ const Level7Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
     const log = INFO_LOGS[id];
     const allLines = [{ text: log.prefix, type: 'cmd' as const }, ...log.lines.map(l => ({ text: l, type: 'output' as const }))];
-    allLines.forEach((line, i) => { setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120); });
-  }, [animating]);
+    allLines.forEach((line, i) => { logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120); });
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -754,9 +754,10 @@ const Level7Interactive = () => {
     setCompleted(next);
     setAnimating(false);
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(7)) completeLevel(7);
+
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(7)) completeLevel(7);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -831,15 +832,23 @@ const Level7Interactive = () => {
                     <span className="text-xs font-mono" style={{ color: TOPICS.find(t => t.id === active)!.color }}>{TOPICS.find(t => t.id === active)!.label}</span>
                   </div>
                   <div className="absolute inset-0 pt-8">
-                    {active === 'basics' && <AnimBasics onDone={handleAnimDone} />}
-                    {active === 'instructions' && <AnimInstructions onDone={handleAnimDone} />}
-                    {active === 'layer-order' && <AnimLayerOrder onDone={handleAnimDone} />}
-                    {active === 'multi-stage' && <AnimMultiStage onDone={handleAnimDone} />}
-                    {active === 'build' && <AnimBuild onDone={handleAnimDone} />}
+                    {active === 'basics' && <AnimBasics onDone={handleAnimDone} paused={paused} />}
+                    {active === 'instructions' && <AnimInstructions onDone={handleAnimDone} paused={paused} />}
+                    {active === 'layer-order' && <AnimLayerOrder onDone={handleAnimDone} paused={paused} />}
+                    {active === 'multi-stage' && <AnimMultiStage onDone={handleAnimDone} paused={paused} />}
+                    {active === 'build' && <AnimBuild onDone={handleAnimDone} paused={paused} />}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           {/* Terminal Log */}

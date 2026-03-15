@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'state-machine' | 'create-start' | 'pause-stop-kill' | 'restart-policies' | 'signals-exit';
 
@@ -173,22 +174,22 @@ const TermHeader = ({ title }: { title: string }) => (
 const STATES_ORDER = ['CREATED', 'RUNNING', 'PAUSED', 'STOPPED', 'RESTARTING', 'DEAD'];
 const JOURNEY = ['IMAGE', 'CREATED', 'RUNNING', 'PAUSED', 'RUNNING', 'STOPPED', 'RUNNING', 'STOPPED'];
 
-const AnimStateMachine = ({ onDone }: { onDone: () => void }) => {
+const AnimStateMachine = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [visibleNodes, setVisibleNodes] = useState(0);
   const [showArrows, setShowArrows] = useState(false);
   const [journeyIdx, setJourneyIdx] = useState(-1);
   const [showSummary, setShowSummary] = useState(false);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-    STATES_ORDER.forEach((_, i) => { t.push(setTimeout(() => setVisibleNodes(i + 1), 400 + i * 250)); });
-    t.push(setTimeout(() => setShowArrows(true), 400 + STATES_ORDER.length * 250));
+    STATES_ORDER.forEach((_, i) => { schedule(() => setVisibleNodes(i + 1), 400 + i * 250); });
+    schedule(() => setShowArrows(true), 400 + STATES_ORDER.length * 250);
     const arrowTime = 400 + STATES_ORDER.length * 250 + 600;
-    JOURNEY.forEach((_, i) => { t.push(setTimeout(() => setJourneyIdx(i), arrowTime + i * 500)); });
-    t.push(setTimeout(() => setShowSummary(true), arrowTime + JOURNEY.length * 500 + 200));
-    t.push(setTimeout(onDone, arrowTime + JOURNEY.length * 500 + 800));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    JOURNEY.forEach((_, i) => { schedule(() => setJourneyIdx(i), arrowTime + i * 500); });
+    schedule(() => setShowSummary(true), arrowTime + JOURNEY.length * 500 + 200);
+    schedule(onDone, arrowTime + JOURNEY.length * 500 + 800);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const currentState = journeyIdx >= 0 ? JOURNEY[journeyIdx] : null;
 
@@ -284,43 +285,42 @@ const AnimStateMachine = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 2: Create & Start ─────────────────────────────────────────────
 
-const AnimCreateStart = ({ onDone }: { onDone: () => void }) => {
+const AnimCreateStart = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [termLines, setTermLines] = useState<{ text: string; isCmd?: boolean; isSuccess?: boolean }[]>([]);
   const [activeState, setActiveState] = useState<string>('IMAGE');
   const [phase, setPhase] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [termLines.length]);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker create --name web nginx:alpine', isCmd: true }]);
-      setTimeout(() => { setTermLines(p => [...p, { text: 'a1b2c3d4e5f6' }]); setActiveState('CREATED'); }, 200);
-    }, 200));
+      schedule(() => { setTermLines(p => [...p, { text: 'a1b2c3d4e5f6' }]); setActiveState('CREATED'); }, 200);
+    }, 200);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker start web', isCmd: true }]);
-      setTimeout(() => { setTermLines(p => [...p, { text: 'web', isSuccess: true }]); setActiveState('RUNNING'); }, 200);
-    }, 1000));
+      schedule(() => { setTermLines(p => [...p, { text: 'web', isSuccess: true }]); setActiveState('RUNNING'); }, 200);
+    }, 1000);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setPhase(1);
       setTermLines(p => [...p, { text: '$ docker run -d --name api node:18-alpine', isCmd: true }]);
-      setTimeout(() => { setTermLines(p => [...p, { text: 'e5f6g7h8i9j0', isSuccess: true }]); }, 200);
-    }, 1700));
+      schedule(() => { setTermLines(p => [...p, { text: 'e5f6g7h8i9j0', isSuccess: true }]); }, 200);
+    }, 1700);
 
-    t.push(setTimeout(() => {
+    schedule(() => {
       setPhase(2);
       setTermLines(p => [...p, { text: '$ docker ps', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'CONTAINER ID  IMAGE         STATUS     NAMES\na1b2c3d4      nginx:alpine  Up 8s      web\ne5f6g7h8      node:18       Up 5s      api' }]), 200);
-    }, 2500));
+      schedule(() => setTermLines(p => [...p, { text: 'CONTAINER ID  IMAGE         STATUS     NAMES\na1b2c3d4      nginx:alpine  Up 8s      web\ne5f6g7h8      node:18       Up 5s      api' }]), 200);
+    }, 2500);
 
-    t.push(setTimeout(() => setPhase(3), 3200));
-    t.push(setTimeout(onDone, 3800));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(3), 3200);
+    schedule(onDone, 3800);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -385,36 +385,30 @@ const AnimCreateStart = ({ onDone }: { onDone: () => void }) => {
 
 type ContainerStatus = 'running' | 'paused' | 'stopping' | 'stopped' | 'killed';
 
-const AnimPauseStopKill = ({ onDone }: { onDone: () => void }) => {
+const AnimPauseStopKill = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [statuses, setStatuses] = useState<ContainerStatus[]>(['running', 'running', 'running']);
   const [phase, setPhase] = useState(0);
   const [countdown, setCountdown] = useState(-1);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
+    schedule(() => { setStatuses(p => { const n = [...p]; n[0] = 'paused'; return n; }); setPhase(1); }, 900);
+    schedule(() => { setStatuses(p => { const n = [...p]; n[0] = 'running'; return n; }); }, 1600);
 
-    // Pause cA
-    t.push(setTimeout(() => { setStatuses(p => { const n = [...p]; n[0] = 'paused'; return n; }); setPhase(1); }, 900));
-    t.push(setTimeout(() => { setStatuses(p => { const n = [...p]; n[0] = 'running'; return n; }); }, 1600));
+    schedule(() => { setPhase(2); setStatuses(p => { const n = [...p]; n[1] = 'stopping'; return n; }); setCountdown(10); }, 2000);
+    schedule(() => setCountdown(6), 2300);
+    schedule(() => setCountdown(2), 2600);
+    schedule(() => { setCountdown(-1); setStatuses(p => { const n = [...p]; n[1] = 'stopped'; return n; }); }, 2900);
 
-    // Stop cB
-    t.push(setTimeout(() => { setPhase(2); setStatuses(p => { const n = [...p]; n[1] = 'stopping'; return n; }); setCountdown(10); }, 2000));
-    t.push(setTimeout(() => setCountdown(6), 2300));
-    t.push(setTimeout(() => setCountdown(2), 2600));
-    t.push(setTimeout(() => { setCountdown(-1); setStatuses(p => { const n = [...p]; n[1] = 'stopped'; return n; }); }, 2900));
+    schedule(() => { setPhase(3); setStatuses(p => { const n = [...p]; n[2] = 'killed'; return n; }); }, 3200);
 
-    // Kill cC
-    t.push(setTimeout(() => { setPhase(3); setStatuses(p => { const n = [...p]; n[2] = 'killed'; return n; }); }, 3200));
+    schedule(() => setPhase(4), 3800);
 
-    // Comparison
-    t.push(setTimeout(() => setPhase(4), 3800));
+    schedule(() => setPhase(5), 4400);
 
-    // Postgres example
-    t.push(setTimeout(() => setPhase(5), 4400));
-
-    t.push(setTimeout(onDone, 5000));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 5000);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const statusColor = (s: ContainerStatus) => {
     switch (s) {
@@ -520,19 +514,18 @@ const AnimPauseStopKill = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 4: Restart Policies ───────────────────────────────────────────
 
-const AnimRestartPolicies = ({ onDone }: { onDone: () => void }) => {
+const AnimRestartPolicies = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 600),
-      setTimeout(() => setPhase(2), 2000),
-      setTimeout(() => setPhase(3), 2800),
-      setTimeout(() => setPhase(4), 3600),
-      setTimeout(onDone, 4200),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 600);
+    schedule(() => setPhase(2), 2000);
+    schedule(() => setPhase(3), 2800);
+    schedule(() => setPhase(4), 3600);
+    schedule(onDone, 4200);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const policies: { name: string; desc: string; behavior: string; badge?: string }[] = [
     { name: 'no', desc: 'Never restart (default)', behavior: '● → ■ stays stopped' },
@@ -609,32 +602,29 @@ $ docker run -d --restart on-failure:5 worker  # max 5 retries`}</pre>
 
 // ─── Animation 5: Signals & Graceful Exit ────────────────────────────────────
 
-const AnimSignalsExit = ({ onDone }: { onDone: () => void }) => {
+const AnimSignalsExit = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [connections, setConnections] = useState(3);
   const [files, setFiles] = useState(2);
   const [dbConn, setDbConn] = useState(1);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-    t.push(setTimeout(() => setPhase(1), 700));
+    schedule(() => setPhase(1), 700);
 
-    // Graceful shutdown countdown
-    t.push(setTimeout(() => { setPhase(2); setConnections(2); }, 1400));
-    t.push(setTimeout(() => setConnections(1), 1600));
-    t.push(setTimeout(() => setConnections(0), 1800));
-    t.push(setTimeout(() => setFiles(0), 2000));
-    t.push(setTimeout(() => { setDbConn(0); setPhase(3); }, 2200));
+    schedule(() => { setPhase(2); setConnections(2); }, 1400);
+    schedule(() => setConnections(1), 1600);
+    schedule(() => setConnections(0), 1800);
+    schedule(() => setFiles(0), 2000);
+    schedule(() => { setDbConn(0); setPhase(3); }, 2200);
 
-    // Bad app
-    t.push(setTimeout(() => setPhase(4), 2800));
+    schedule(() => setPhase(4), 2800);
 
-    // PID 1
-    t.push(setTimeout(() => setPhase(5), 3600));
+    schedule(() => setPhase(5), 3600);
 
-    t.push(setTimeout(onDone, 4300));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 4300);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -781,7 +771,9 @@ const Level12Interactive = () => {
   const [infoLines, setInfoLines] = useState<{ text: string; type: 'cmd' | 'output' }[]>([]);
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
+  const [paused, setPaused] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+  const logTimers = usePausableTimers(paused);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -789,12 +781,13 @@ const Level12Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
     const log = INFO_LOGS[id];
     const allLines = [{ text: log.prefix, type: 'cmd' as const }, ...log.lines.map(l => ({ text: l, type: 'output' as const }))];
-    allLines.forEach((line, i) => { setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120); });
-  }, [animating]);
+    allLines.forEach((line, i) => { logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120); });
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -804,9 +797,9 @@ const Level12Interactive = () => {
     setCompleted(next);
     setAnimating(false);
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(12)) completeLevel(12);
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(12)) completeLevel(12);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -883,15 +876,23 @@ const Level12Interactive = () => {
                     <span className="text-xs font-mono" style={{ color: TOPICS.find(t => t.id === active)!.color }}>{TOPICS.find(t => t.id === active)!.label}</span>
                   </div>
                   <div className="absolute inset-0 pt-8">
-                    {active === 'state-machine' && <AnimStateMachine onDone={handleAnimDone} />}
-                    {active === 'create-start' && <AnimCreateStart onDone={handleAnimDone} />}
-                    {active === 'pause-stop-kill' && <AnimPauseStopKill onDone={handleAnimDone} />}
-                    {active === 'restart-policies' && <AnimRestartPolicies onDone={handleAnimDone} />}
-                    {active === 'signals-exit' && <AnimSignalsExit onDone={handleAnimDone} />}
+                    {active === 'state-machine' && <AnimStateMachine onDone={handleAnimDone} paused={paused} />}
+                    {active === 'create-start' && <AnimCreateStart onDone={handleAnimDone} paused={paused} />}
+                    {active === 'pause-stop-kill' && <AnimPauseStopKill onDone={handleAnimDone} paused={paused} />}
+                    {active === 'restart-policies' && <AnimRestartPolicies onDone={handleAnimDone} paused={paused} />}
+                    {active === 'signals-exit' && <AnimSignalsExit onDone={handleAnimDone} paused={paused} />}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           {/* Terminal log */}

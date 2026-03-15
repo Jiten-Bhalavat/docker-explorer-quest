@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'docker-desktop' | 'linux-install' | 'components' | 'daemon' | 'verify';
 
@@ -231,19 +232,18 @@ const renderTermLine = (line: TermLine) => {
 
 // ─── Animation 1: Docker Desktop ─────────────────────────────────────────────
 
-const AnimDockerDesktop = ({ onDone }: { onDone: () => void }) => {
+const AnimDockerDesktop = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 600),
-      setTimeout(() => setPhase(2), 1600),
-      setTimeout(() => setPhase(3), 2400),
-      setTimeout(() => setPhase(4), 3000),
-      setTimeout(onDone, 3600),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 600);
+    schedule(() => setPhase(2), 1600);
+    schedule(() => setPhase(3), 2400);
+    schedule(() => setPhase(4), 3000);
+    schedule(onDone, 3600);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const INSTALL_STEPS = ['Extracting files...', 'Installing Docker Engine...', 'Installing Docker CLI...', 'Setting up Docker Compose...'];
 
@@ -395,17 +395,18 @@ const LINUX_LINES: TermLine[] = [
   { text: '  Docker version 24.0.5, build ced0996 ✓', type: 'success' },
 ];
 
-const AnimLinuxInstall = ({ onDone }: { onDone: () => void }) => {
+const AnimLinuxInstall = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [shown, setShown] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const timers = LINUX_LINES.map((_, i) =>
-      setTimeout(() => setShown(i + 1), 300 + i * 160),
+    LINUX_LINES.forEach((_, i) =>
+      schedule(() => setShown(i + 1), 300 + i * 160),
     );
-    timers.push(setTimeout(onDone, 300 + LINUX_LINES.length * 160 + 400));
-    return () => timers.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 300 + LINUX_LINES.length * 160 + 400);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -442,8 +443,9 @@ const AnimLinuxInstall = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 3: What Gets Installed (Component Stack) ──────────────────────
 
-const AnimComponents = ({ onDone }: { onDone: () => void }) => {
-  useEffect(() => { const t = setTimeout(onDone, 3200); return () => clearTimeout(t); }, [onDone]);
+const AnimComponents = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
+  const { schedule, clearAll } = usePausableTimers(paused);
+  useEffect(() => { schedule(onDone, 3200); return clearAll; }, [onDone, schedule, clearAll]);
 
   const ENGINE_PARTS = [
     { name: 'Docker Daemon (dockerd)', icon: '⚙️', desc: 'Background service that manages everything', delay: 0.6 },
@@ -576,18 +578,17 @@ const DAEMON_LINES = [
   { x1: '74%', y1: '64%', x2: '57%', y2: '52%', delay: 1.2 },
 ];
 
-const AnimDaemon = ({ onDone }: { onDone: () => void }) => {
+const AnimDaemon = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [flowStep, setFlowStep] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setFlowStep(1), 1500),
-      setTimeout(() => setFlowStep(2), 1800),
-      setTimeout(() => setFlowStep(3), 2100),
-      setTimeout(onDone, 3000),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setFlowStep(1), 1500);
+    schedule(() => setFlowStep(2), 1800);
+    schedule(() => setFlowStep(3), 2100);
+    schedule(onDone, 3000);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="relative w-full h-full overflow-hidden">
@@ -694,16 +695,17 @@ const VERIFY_LINES: TermLine[] = [
 
 const CHECKLIST = ['Docker version verified', 'Docker daemon running', 'Hello-world container works'];
 
-const AnimVerify = ({ onDone }: { onDone: () => void }) => {
+const AnimVerify = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [shown, setShown] = useState(0);
   const [checks, setChecks] = useState([false, false, false]);
   const [allDone, setAllDone] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const timers = VERIFY_LINES.map((line, i) => {
+    VERIFY_LINES.forEach((line, i) => {
       const delay = 400 + i * 160;
-      return setTimeout(() => {
+      schedule(() => {
         setShown(i + 1);
         if (line.checkIndex !== undefined) {
           setChecks(prev => { const next = [...prev]; next[line.checkIndex!] = true; return next; });
@@ -711,10 +713,10 @@ const AnimVerify = ({ onDone }: { onDone: () => void }) => {
       }, delay);
     });
     const lastDelay = 400 + VERIFY_LINES.length * 160;
-    timers.push(setTimeout(() => setAllDone(true), lastDelay + 300));
-    timers.push(setTimeout(onDone, lastDelay + 600));
-    return () => timers.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setAllDone(true), lastDelay + 300);
+    schedule(onDone, lastDelay + 600);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -795,6 +797,8 @@ const Level3Interactive = () => {
   const [infoLines, setInfoLines] = useState<{ text: string; type: 'cmd' | 'output' }[]>([]);
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const logTimers = usePausableTimers(paused);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -803,6 +807,7 @@ const Level3Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
 
@@ -812,9 +817,9 @@ const Level3Interactive = () => {
       ...log.lines.map(l => ({ text: l, type: 'output' as const })),
     ];
     allLines.forEach((line, i) => {
-      setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120);
+      logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120);
     });
-  }, [animating]);
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -825,10 +830,10 @@ const Level3Interactive = () => {
     setAnimating(false);
 
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(3)) completeLevel(3);
 
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(3)) completeLevel(3);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -933,14 +938,22 @@ const Level3Interactive = () => {
                       {TOPICS.find(t => t.id === active)!.label}
                     </span>
                   </div>
-                  {active === 'docker-desktop' && <AnimDockerDesktop onDone={handleAnimDone} />}
-                  {active === 'linux-install' && <AnimLinuxInstall onDone={handleAnimDone} />}
-                  {active === 'components' && <AnimComponents onDone={handleAnimDone} />}
-                  {active === 'daemon' && <AnimDaemon onDone={handleAnimDone} />}
-                  {active === 'verify' && <AnimVerify onDone={handleAnimDone} />}
+                  {active === 'docker-desktop' && <AnimDockerDesktop onDone={handleAnimDone} paused={paused} />}
+                  {active === 'linux-install' && <AnimLinuxInstall onDone={handleAnimDone} paused={paused} />}
+                  {active === 'components' && <AnimComponents onDone={handleAnimDone} paused={paused} />}
+                  {active === 'daemon' && <AnimDaemon onDone={handleAnimDone} paused={paused} />}
+                  {active === 'verify' && <AnimVerify onDone={handleAnimDone} paused={paused} />}
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           {/* Install Log (Terminal-style) */}

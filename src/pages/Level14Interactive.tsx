@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'h-vs-v' | 'load-balance' | 'compose-scale' | 'resources' | 'auto-scale';
 
@@ -173,25 +174,25 @@ const ContainerBox = ({ name, cpu, status = 'running', color = '#10B981', small 
 
 // ─── Animation 1: H vs V Scaling ─────────────────────────────────────────────
 
-const AnimHvsV = ({ onDone }: { onDone: () => void }) => {
+const AnimHvsV = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [traffic, setTraffic] = useState(100);
   const [vScale, setVScale] = useState(1);
   const [hCount, setHCount] = useState(1);
   const [vDead, setVDead] = useState(false);
   const [hDead, setHDead] = useState(-1);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-    t.push(setTimeout(() => { setTraffic(400); setPhase(1); }, 500));
-    t.push(setTimeout(() => setTraffic(800), 900));
-    t.push(setTimeout(() => { setVScale(1.4); setHCount(3); setPhase(2); }, 1200));
-    t.push(setTimeout(() => { setVDead(true); setHDead(1); setPhase(3); }, 2400));
-    t.push(setTimeout(() => { setHDead(-1); setHCount(3); }, 3000));
-    t.push(setTimeout(() => setPhase(4), 3200));
-    t.push(setTimeout(onDone, 3900));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => { setTraffic(400); setPhase(1); }, 500);
+    schedule(() => setTraffic(800), 900);
+    schedule(() => { setVScale(1.4); setHCount(3); setPhase(2); }, 1200);
+    schedule(() => { setVDead(true); setHDead(1); setPhase(3); }, 2400);
+    schedule(() => { setHDead(-1); setHCount(3); }, 3000);
+    schedule(() => setPhase(4), 3200);
+    schedule(onDone, 3900);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const vCpu = phase >= 2 ? 60 : phase >= 1 ? 90 : 25;
   const hCpu = phase >= 2 ? 30 : phase >= 1 ? 90 : 25;
@@ -263,30 +264,30 @@ const AnimHvsV = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 2: Load Balancing ─────────────────────────────────────────────
 
-const AnimLoadBalance = ({ onDone }: { onDone: () => void }) => {
+const AnimLoadBalance = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [loads, setLoads] = useState([30, 30, 30]);
   const [activeRoute, setActiveRoute] = useState(-1);
   const [unhealthy, setUnhealthy] = useState(-1);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
     // Round robin
-    t.push(setTimeout(() => { setPhase(1); setActiveRoute(0); }, 600));
-    t.push(setTimeout(() => setActiveRoute(1), 900));
-    t.push(setTimeout(() => setActiveRoute(2), 1200));
-    t.push(setTimeout(() => setActiveRoute(0), 1500));
+    schedule(() => { setPhase(1); setActiveRoute(0); }, 600);
+    schedule(() => setActiveRoute(1), 900);
+    schedule(() => setActiveRoute(2), 1200);
+    schedule(() => setActiveRoute(0), 1500);
 
     // Least connections
-    t.push(setTimeout(() => { setPhase(2); setLoads([80, 20, 45]); setActiveRoute(1); }, 1800));
+    schedule(() => { setPhase(2); setLoads([80, 20, 45]); setActiveRoute(1); }, 1800);
 
     // Health check failure
-    t.push(setTimeout(() => { setPhase(3); setUnhealthy(1); setActiveRoute(-1); }, 2400));
-    t.push(setTimeout(() => { setUnhealthy(-1); setPhase(4); }, 3200));
+    schedule(() => { setPhase(3); setUnhealthy(1); setActiveRoute(-1); }, 2400);
+    schedule(() => { setUnhealthy(-1); setPhase(4); }, 3200);
 
-    t.push(setTimeout(onDone, 3900));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 3900);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const containers = ['API-1', 'API-2', 'API-3'];
 
@@ -353,62 +354,61 @@ const AnimLoadBalance = ({ onDone }: { onDone: () => void }) => {
 
 interface Replica { name: string; status: 'running' | 'updating' | 'removing' }
 
-const AnimComposeScale = ({ onDone }: { onDone: () => void }) => {
+const AnimComposeScale = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [termLines, setTermLines] = useState<{ text: string; isCmd?: boolean; isSuccess?: boolean }[]>([]);
   const [replicas, setReplicas] = useState<Replica[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [termLines.length]);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-
     // Step 1: initial up
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker compose up -d', isCmd: true }]);
-      setTimeout(() => {
+      schedule(() => {
         setTermLines(p => [...p, { text: '✔ app-web-1 Started', isSuccess: true }, { text: '✔ app-api-1 Started', isSuccess: true }, { text: '✔ app-db-1  Started', isSuccess: true }]);
         setReplicas([{ name: 'web-1', status: 'running' }, { name: 'api-1', status: 'running' }, { name: 'db-1', status: 'running' }]);
       }, 300);
-    }, 200));
+    }, 200);
 
     // Step 2: scale up
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker compose up -d --scale api=3', isCmd: true }]);
-      setTimeout(() => {
+      schedule(() => {
         setTermLines(p => [...p, { text: '✔ app-api-2 Started', isSuccess: true }, { text: '✔ app-api-3 Started', isSuccess: true }]);
         setReplicas(prev => [...prev, { name: 'api-2', status: 'running' }, { name: 'api-3', status: 'running' }]);
       }, 300);
-    }, 1200));
+    }, 1200);
 
     // Step 3: scale down
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker compose up -d --scale api=2', isCmd: true }]);
-      setTimeout(() => {
+      schedule(() => {
         setTermLines(p => [...p, { text: '✔ app-api-3 Removed' }]);
         setReplicas(prev => prev.filter(r => r.name !== 'api-3'));
       }, 300);
-    }, 2000));
+    }, 2000);
 
     // Step 4: rolling update
-    t.push(setTimeout(() => {
+    schedule(() => {
       setTermLines(p => [...p, { text: '$ docker compose up -d api  # rolling update', isCmd: true }]);
-      setTimeout(() => {
+      schedule(() => {
         setReplicas(prev => prev.map(r => r.name === 'api-1' ? { ...r, status: 'updating' } : r));
         setTermLines(p => [...p, { text: '✔ app-api-1 Recreated', isSuccess: true }]);
       }, 200);
-      setTimeout(() => {
+      schedule(() => {
         setReplicas(prev => prev.map(r => r.name === 'api-1' ? { ...r, status: 'running' } : r.name === 'api-2' ? { ...r, status: 'updating' } : r));
         setTermLines(p => [...p, { text: '✔ app-api-2 Recreated', isSuccess: true }]);
       }, 600);
-      setTimeout(() => {
+      schedule(() => {
         setReplicas(prev => prev.map(r => ({ ...r, status: 'running' })));
       }, 1000);
-    }, 2800));
+    }, 2800);
 
-    t.push(setTimeout(onDone, 4200));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 4200);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -446,7 +446,7 @@ const AnimComposeScale = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 4: Resource Limits ────────────────────────────────────────────
 
-const AnimResources = ({ onDone }: { onDone: () => void }) => {
+const AnimResources = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [stats, setStats] = useState([
     { name: 'hungry-app', cpu: 10, mem: 50, memLimit: 0 },
@@ -454,32 +454,31 @@ const AnimResources = ({ onDone }: { onDone: () => void }) => {
     { name: 'db', cpu: 12, mem: 234, memLimit: 1024 },
   ]);
   const [oom, setOom] = useState(false);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-
     // Noisy neighbor
-    t.push(setTimeout(() => { setPhase(1); setStats(prev => prev.map((s, i) => i === 0 ? { ...s, cpu: 95, mem: 950 } : s)); }, 200));
+    schedule(() => { setPhase(1); setStats(prev => prev.map((s, i) => i === 0 ? { ...s, cpu: 95, mem: 950 } : s)); }, 200);
 
     // Set CPU limit
-    t.push(setTimeout(() => {
+    schedule(() => {
       setPhase(2);
       setStats(prev => [{ name: 'api', cpu: 48, mem: 300, memLimit: 512 }, prev[1], prev[2]]);
-    }, 1000));
+    }, 1000);
 
     // Set memory limit
-    t.push(setTimeout(() => setPhase(3), 1800));
+    schedule(() => setPhase(3), 1800);
 
     // OOM
-    t.push(setTimeout(() => { setOom(true); setPhase(4); }, 2600));
-    t.push(setTimeout(() => { setOom(false); setStats(prev => prev.map((s, i) => i === 0 ? { ...s, mem: 100 } : s)); }, 3100));
+    schedule(() => { setOom(true); setPhase(4); }, 2600);
+    schedule(() => { setOom(false); setStats(prev => prev.map((s, i) => i === 0 ? { ...s, mem: 100 } : s)); }, 3100);
 
     // docker stats
-    t.push(setTimeout(() => setPhase(5), 3400));
+    schedule(() => setPhase(5), 3400);
 
-    t.push(setTimeout(onDone, 4100));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 4100);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col p-3 gap-2 overflow-y-auto">
@@ -542,36 +541,35 @@ db         12.4%   234MiB/1GiB     23% ✓`}</pre>
 
 // ─── Animation 5: Auto-Scaling ───────────────────────────────────────────────
 
-const AnimAutoScale = ({ onDone }: { onDone: () => void }) => {
+const AnimAutoScale = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [traffic, setTraffic] = useState(20);
   const [replicas, setReplicas] = useState(2);
   const [phase, setPhase] = useState(0);
   const [cooldown, setCooldown] = useState(false);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-
     // Spike
-    t.push(setTimeout(() => { setTraffic(50); setPhase(1); }, 500));
-    t.push(setTimeout(() => setTraffic(80), 800));
-    t.push(setTimeout(() => { setTraffic(95); }, 1100));
+    schedule(() => { setTraffic(50); setPhase(1); }, 500);
+    schedule(() => setTraffic(80), 800);
+    schedule(() => { setTraffic(95); }, 1100);
 
     // Scale up
-    t.push(setTimeout(() => { setPhase(2); setReplicas(4); }, 1500));
+    schedule(() => { setPhase(2); setReplicas(4); }, 1500);
 
     // Traffic drops
-    t.push(setTimeout(() => { setTraffic(40); setPhase(3); }, 2400));
-    t.push(setTimeout(() => setTraffic(20), 2700));
+    schedule(() => { setTraffic(40); setPhase(3); }, 2400);
+    schedule(() => setTraffic(20), 2700);
 
     // Cool-down + scale down
-    t.push(setTimeout(() => setCooldown(true), 3000));
-    t.push(setTimeout(() => { setCooldown(false); setReplicas(2); setPhase(4); }, 3500));
+    schedule(() => setCooldown(true), 3000);
+    schedule(() => { setCooldown(false); setReplicas(2); setPhase(4); }, 3500);
 
     // Tools
-    t.push(setTimeout(() => setPhase(5), 3800));
-    t.push(setTimeout(onDone, 4500));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(5), 3800);
+    schedule(onDone, 4500);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const cpuPerReplica = Math.round(traffic / replicas * 1.2);
   const trafficColor = traffic > 80 ? '#EF4444' : traffic > 50 ? '#F59E0B' : '#10B981';
@@ -663,6 +661,8 @@ const Level14Interactive = () => {
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+  const [paused, setPaused] = useState(false);
+  const logTimers = usePausableTimers(paused);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -670,12 +670,13 @@ const Level14Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
     const log = INFO_LOGS[id];
     const allLines = [{ text: log.prefix, type: 'cmd' as const }, ...log.lines.map(l => ({ text: l, type: 'output' as const }))];
-    allLines.forEach((line, i) => { setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120); });
-  }, [animating]);
+    allLines.forEach((line, i) => { logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120); });
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -685,9 +686,9 @@ const Level14Interactive = () => {
     setCompleted(next);
     setAnimating(false);
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(14)) completeLevel(14);
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(14)) completeLevel(14);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -758,15 +759,23 @@ const Level14Interactive = () => {
                     <span className="text-xs font-mono" style={{ color: TOPICS.find(t => t.id === active)!.color }}>{TOPICS.find(t => t.id === active)!.label}</span>
                   </div>
                   <div className="absolute inset-0 pt-8">
-                    {active === 'h-vs-v' && <AnimHvsV onDone={handleAnimDone} />}
-                    {active === 'load-balance' && <AnimLoadBalance onDone={handleAnimDone} />}
-                    {active === 'compose-scale' && <AnimComposeScale onDone={handleAnimDone} />}
-                    {active === 'resources' && <AnimResources onDone={handleAnimDone} />}
-                    {active === 'auto-scale' && <AnimAutoScale onDone={handleAnimDone} />}
+                    {active === 'h-vs-v' && <AnimHvsV onDone={handleAnimDone} paused={paused} />}
+                    {active === 'load-balance' && <AnimLoadBalance onDone={handleAnimDone} paused={paused} />}
+                    {active === 'compose-scale' && <AnimComposeScale onDone={handleAnimDone} paused={paused} />}
+                    {active === 'resources' && <AnimResources onDone={handleAnimDone} paused={paused} />}
+                    {active === 'auto-scale' && <AnimAutoScale onDone={handleAnimDone} paused={paused} />}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           <div className="shrink-0 border-t border-border" style={{ height: 200 }}>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/useGameStore';
+import { usePausableTimers } from '@/hooks/usePausableTimers';
 
 type TopicId = 'what-registry' | 'push-pull' | 'private-reg' | 'tagging' | 'ci-cd';
 
@@ -164,19 +165,18 @@ const MachineNode = ({ icon, label, sub, color, active }: { icon: string; label:
 
 // ─── Animation 1: What is a Registry ─────────────────────────────────────────
 
-const AnimWhatRegistry = ({ onDone }: { onDone: () => void }) => {
+const AnimWhatRegistry = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 700),
-      setTimeout(() => setPhase(2), 1500),
-      setTimeout(() => setPhase(3), 2400),
-      setTimeout(() => setPhase(4), 3200),
-      setTimeout(onDone, 3900),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 700);
+    schedule(() => setPhase(2), 1500);
+    schedule(() => setPhase(3), 2400);
+    schedule(() => setPhase(4), 3200);
+    schedule(onDone, 3900);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex flex-col items-center p-4 gap-3 overflow-y-auto">
@@ -273,65 +273,64 @@ const AnimWhatRegistry = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 2: Push & Pull ────────────────────────────────────────────────
 
-const AnimPushPull = ({ onDone }: { onDone: () => void }) => {
+const AnimPushPull = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [termLines, setTermLines] = useState<{ text: string; isCmd?: boolean; isSuccess?: boolean }[]>([]);
   const [flowState, setFlowState] = useState<'idle' | 'auth' | 'tagged' | 'pushing' | 'pushed' | 'pulling' | 'running'>('idle');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [termLines.length]);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-
     // Auth
-    t.push(setTimeout(() => {
+    schedule(() => {
       setFlowState('auth');
       setTermLines(p => [...p, { text: '$ docker login', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'Username: jiten-dev' }, { text: 'Login Succeeded ✓', isSuccess: true }]), 200);
-    }, 200));
+      schedule(() => setTermLines(p => [...p, { text: 'Username: jiten-dev' }, { text: 'Login Succeeded ✓', isSuccess: true }]), 200);
+    }, 200);
 
     // Tag
-    t.push(setTimeout(() => {
+    schedule(() => {
       setFlowState('tagged');
       setTermLines(p => [...p, { text: '$ docker build -t myapp .', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'Successfully tagged myapp:latest ✓', isSuccess: true }]), 200);
-      setTimeout(() => {
+      schedule(() => setTermLines(p => [...p, { text: 'Successfully tagged myapp:latest ✓', isSuccess: true }]), 200);
+      schedule(() => {
         setTermLines(p => [...p, { text: '$ docker tag myapp jiten-dev/myapp:1.0.0', isCmd: true }]);
       }, 400);
-    }, 900));
+    }, 900);
 
     // Push
-    t.push(setTimeout(() => {
+    schedule(() => {
       setFlowState('pushing');
       setTermLines(p => [...p, { text: '$ docker push jiten-dev/myapp:1.0.0', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'a1b2c3d4: Pushing  1.0MB/45.2MB' }]), 200);
-      setTimeout(() => setTermLines(p => [...p, { text: 'b2c3d4e5: Pushing  512kB/12.3MB' }]), 350);
-      setTimeout(() => setTermLines(p => [...p, { text: 'c3d4e5f6: Layer already exists ✓', isSuccess: true }]), 500);
-      setTimeout(() => {
+      schedule(() => setTermLines(p => [...p, { text: 'a1b2c3d4: Pushing  1.0MB/45.2MB' }]), 200);
+      schedule(() => setTermLines(p => [...p, { text: 'b2c3d4e5: Pushing  512kB/12.3MB' }]), 350);
+      schedule(() => setTermLines(p => [...p, { text: 'c3d4e5f6: Layer already exists ✓', isSuccess: true }]), 500);
+      schedule(() => {
         setTermLines(p => [...p, { text: '1.0.0: digest: sha256:abc123... ✓', isSuccess: true }]);
         setFlowState('pushed');
       }, 700);
-    }, 1800));
+    }, 1800);
 
     // Pull on remote
-    t.push(setTimeout(() => {
+    schedule(() => {
       setFlowState('pulling');
       setTermLines(p => [...p, { text: '$ ssh remote-server', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: '$ docker pull jiten-dev/myapp:1.0.0', isCmd: true }]), 200);
-      setTimeout(() => setTermLines(p => [...p, { text: 'a1b2c3d4: Pull complete ✓', isSuccess: true }]), 400);
-      setTimeout(() => setTermLines(p => [...p, { text: 'Status: Downloaded ✓', isSuccess: true }]), 600);
-    }, 3000));
+      schedule(() => setTermLines(p => [...p, { text: '$ docker pull jiten-dev/myapp:1.0.0', isCmd: true }]), 200);
+      schedule(() => setTermLines(p => [...p, { text: 'a1b2c3d4: Pull complete ✓', isSuccess: true }]), 400);
+      schedule(() => setTermLines(p => [...p, { text: 'Status: Downloaded ✓', isSuccess: true }]), 600);
+    }, 3000);
 
     // Run
-    t.push(setTimeout(() => {
+    schedule(() => {
       setFlowState('running');
       setTermLines(p => [...p, { text: '$ docker run -d -p 80:3000 jiten-dev/myapp:1.0.0', isCmd: true }]);
-      setTimeout(() => setTermLines(p => [...p, { text: 'e5f6g7h8 ● RUNNING', isSuccess: true }]), 200);
-    }, 4000));
+      schedule(() => setTermLines(p => [...p, { text: 'e5f6g7h8 ● RUNNING', isSuccess: true }]), 200);
+    }, 4000);
 
-    t.push(setTimeout(onDone, 4800));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(onDone, 4800);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -393,19 +392,18 @@ const AnimPushPull = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 3: Private Registries ─────────────────────────────────────────
 
-const AnimPrivateReg = ({ onDone }: { onDone: () => void }) => {
+const AnimPrivateReg = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 800),
-      setTimeout(() => setPhase(2), 2200),
-      setTimeout(() => setPhase(3), 3200),
-      setTimeout(() => setPhase(4), 4000),
-      setTimeout(onDone, 4700),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 800);
+    schedule(() => setPhase(2), 2200);
+    schedule(() => setPhase(3), 3200);
+    schedule(() => setPhase(4), 4000);
+    schedule(onDone, 4700);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const providers = [
     { name: 'AWS ECR', color: '#F97316', badge: 'Pay per GB', login: 'aws ecr get-login-password | docker login ...amazonaws.com', push: '123456789.dkr.ecr.us-east-1.amazonaws.com/myapp:1.0' },
@@ -500,19 +498,18 @@ const AnimPrivateReg = ({ onDone }: { onDone: () => void }) => {
 
 // ─── Animation 4: Tagging Strategies ─────────────────────────────────────────
 
-const AnimTagging = ({ onDone }: { onDone: () => void }) => {
+const AnimTagging = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t = [
-      setTimeout(() => setPhase(1), 600),
-      setTimeout(() => setPhase(2), 1500),
-      setTimeout(() => setPhase(3), 2400),
-      setTimeout(() => setPhase(4), 3200),
-      setTimeout(onDone, 3900),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 600);
+    schedule(() => setPhase(2), 1500);
+    schedule(() => setPhase(3), 2400);
+    schedule(() => setPhase(4), 3200);
+    schedule(onDone, 3900);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   return (
     <div className="w-full h-full flex gap-0">
@@ -633,21 +630,21 @@ $ docker tag myapp myapp:latest  # floating`}</pre>
 
 // ─── Animation 5: Registry in CI/CD ──────────────────────────────────────────
 
-const AnimCICD = ({ onDone }: { onDone: () => void }) => {
+const AnimCICD = ({ onDone, paused }: { onDone: () => void; paused: boolean }) => {
   const [phase, setPhase] = useState(0);
   const [rollback, setRollback] = useState(false);
+  const { schedule, clearAll } = usePausableTimers(paused);
 
   useEffect(() => {
-    const t: ReturnType<typeof setTimeout>[] = [];
-    t.push(setTimeout(() => setPhase(1), 600));
-    t.push(setTimeout(() => setPhase(2), 1800));
-    t.push(setTimeout(() => setPhase(3), 3000));
-    t.push(setTimeout(() => { setPhase(4); setRollback(true); }, 3600));
-    t.push(setTimeout(() => setRollback(false), 4200));
-    t.push(setTimeout(() => setPhase(5), 4400));
-    t.push(setTimeout(onDone, 5000));
-    return () => t.forEach(clearTimeout);
-  }, [onDone]);
+    schedule(() => setPhase(1), 600);
+    schedule(() => setPhase(2), 1800);
+    schedule(() => setPhase(3), 3000);
+    schedule(() => { setPhase(4); setRollback(true); }, 3600);
+    schedule(() => setRollback(false), 4200);
+    schedule(() => setPhase(5), 4400);
+    schedule(onDone, 5000);
+    return clearAll;
+  }, [onDone, schedule, clearAll]);
 
   const pipelineNodes = [
     { icon: '👨‍💻', label: 'Developer', active: phase >= 0 },
@@ -771,6 +768,8 @@ const Level13Interactive = () => {
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+  const [paused, setPaused] = useState(false);
+  const logTimers = usePausableTimers(paused);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -778,12 +777,13 @@ const Level13Interactive = () => {
 
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
+    setPaused(false);
     setActive(id);
     setAnimating(true);
     const log = INFO_LOGS[id];
     const allLines = [{ text: log.prefix, type: 'cmd' as const }, ...log.lines.map(l => ({ text: l, type: 'output' as const }))];
-    allLines.forEach((line, i) => { setTimeout(() => setInfoLines(prev => [...prev, line]), i * 120); });
-  }, [animating]);
+    allLines.forEach((line, i) => { logTimers.schedule(() => setInfoLines(prev => [...prev, line]), i * 120); });
+  }, [animating, logTimers]);
 
   const handleAnimDone = useCallback(() => {
     if (!active) return;
@@ -793,9 +793,9 @@ const Level13Interactive = () => {
     setCompleted(next);
     setAnimating(false);
     if (wasNew) setLocalXP(prev => prev + 20);
+    if (wasNew && !completedLevels.includes(13)) completeLevel(13);
     if (next.size === 5 && !levelDone) {
       setLevelDone(true);
-      if (!completedLevels.includes(13)) completeLevel(13);
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
@@ -867,15 +867,23 @@ const Level13Interactive = () => {
                     <span className="text-xs font-mono" style={{ color: TOPICS.find(t => t.id === active)!.color }}>{TOPICS.find(t => t.id === active)!.label}</span>
                   </div>
                   <div className="absolute inset-0 pt-8">
-                    {active === 'what-registry' && <AnimWhatRegistry onDone={handleAnimDone} />}
-                    {active === 'push-pull' && <AnimPushPull onDone={handleAnimDone} />}
-                    {active === 'private-reg' && <AnimPrivateReg onDone={handleAnimDone} />}
-                    {active === 'tagging' && <AnimTagging onDone={handleAnimDone} />}
-                    {active === 'ci-cd' && <AnimCICD onDone={handleAnimDone} />}
+                    {active === 'what-registry' && <AnimWhatRegistry onDone={handleAnimDone} paused={paused} />}
+                    {active === 'push-pull' && <AnimPushPull onDone={handleAnimDone} paused={paused} />}
+                    {active === 'private-reg' && <AnimPrivateReg onDone={handleAnimDone} paused={paused} />}
+                    {active === 'tagging' && <AnimTagging onDone={handleAnimDone} paused={paused} />}
+                    {active === 'ci-cd' && <AnimCICD onDone={handleAnimDone} paused={paused} />}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
+            {animating && (
+              <button onClick={() => setPaused(p => !p)}
+                className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
+                style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
+                title={paused ? 'Resume' : 'Pause'}>
+                {paused ? '▶' : '⏸'}
+              </button>
+            )}
           </div>
 
           <div className="shrink-0 border-t border-border" style={{ height: 200 }}>
