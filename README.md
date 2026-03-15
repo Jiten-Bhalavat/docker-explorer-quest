@@ -1,73 +1,59 @@
-# Welcome to your Lovable project
+# Docker Explorer Quest
 
-## Project info
+A web-based learning game that teaches Docker through 15 interactive, animated levels. Each level focuses on a specific topic—from “What is Docker?” to real-world deployment—with visualizations, terminal-style demos, and concept notes.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## What’s inside
 
-## How can I edit this code?
+- **15 levels** — Fundamentals, images, containers, commands, Dockerfile, build, volumes, networking, Compose, lifecycle, registry, scaling, and a capstone “Real World Deployment” level.
+- **Interactive animations** — Each level has 5 topic sections with Framer Motion animations that show concepts step-by-step.
+- **Pause / resume** — Pause any animation to read at your own pace; resume from the same frame.
+- **All levels unlocked** — Jump to any level; no need to complete previous ones.
+- **Progress & XP** — Complete topics to earn XP; finishing a level marks it complete (green) and awards a level bonus.
+- **Level 15 graduation** — Finishing the final level unlocks a certificate-style screen and “Docker Master” style completion.
 
-There are several ways of editing your application.
+## Tech stack
 
-**Use Lovable**
+- **React** + **Vite** + **TypeScript**
+- **Tailwind CSS** + **shadcn-ui**
+- **Framer Motion** for animations
+- **Zustand** (persisted) for progress, XP, and badges
+- **React Router** for navigation
+- Fonts: **Syne** (UI) and **JetBrains Mono** (terminal/code)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Run locally
 
-Changes made via Lovable will be committed automatically to this repo.
+```bash
+# Install dependencies
+npm install
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start dev server (with hot reload)
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Then open the URL shown in the terminal (e.g. `http://localhost:5173`).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Build for production
 
-**Use GitHub Codespaces**
+```bash
+npm run build
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Output is in the `dist/` folder. Serve it with any static host.
 
-## What technologies are used for this project?
+## Project structure (high level)
 
-This project is built with:
+- `src/pages/` — Level routes and interactive level pages (`Level1Interactive.tsx` … `Level15Interactive.tsx`).
+- `src/components/game/` — Shared UI (e.g. `LevelCard`, `AchievementPopup`).
+- `src/data/levelData.ts` — Level titles and descriptions for the dashboard.
+- `src/store/useGameStore.ts` — Global state (completed levels, XP, badges).
+- `src/hooks/usePausableTimers.ts` — Hook used by levels to pause/resume animation timers.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Deploy
 
-## How can I deploy this project?
+Build with `npm run build` and deploy the `dist/` directory to any static hosting (Vercel, Netlify, GitHub Pages, etc.). No server or env vars are required for the app itself.
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+---
 
-## Can I connect a custom domain to my Lovable project?
+**Docker Explorer Quest** — Learn Docker from scratch, one level at a time.
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Built with ❤️ by **Jiten Bhalavat**
