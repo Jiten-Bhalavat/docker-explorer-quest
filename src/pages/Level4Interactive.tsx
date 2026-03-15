@@ -671,6 +671,7 @@ const Level4Interactive = () => {
   const [localXP, setLocalXP] = useState(0);
   const [levelDone, setLevelDone] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [animRunId, setAnimRunId] = useState(0);
   const logTimers = usePausableTimers(paused);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -681,6 +682,7 @@ const Level4Interactive = () => {
   const runTopic = useCallback((id: TopicId) => {
     if (animating) return;
     setPaused(false);
+    setAnimRunId(prev => prev + 1);
     setActive(id);
     setAnimating(true);
 
@@ -710,7 +712,7 @@ const Level4Interactive = () => {
     }
   }, [active, completed, levelDone, completedLevels, completeLevel]);
 
-  const animKey = active ? `${active}-${Date.now()}` : '';
+  const animKey = active ? `${active}-${animRunId}` : '';
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: '#070B14' }}>
@@ -804,7 +806,7 @@ const Level4Interactive = () => {
                 </motion.div>
               )}
             </AnimatePresence>
-            {animating && (
+            {active && (
               <button onClick={() => setPaused(p => !p)}
                 className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full border flex items-center justify-center text-sm transition-colors"
                 style={{ borderColor: paused ? '#10B98150' : '#ffffff20', background: paused ? '#10B98115' : '#070B14CC', color: paused ? '#10B981' : '#94A3B8' }}
