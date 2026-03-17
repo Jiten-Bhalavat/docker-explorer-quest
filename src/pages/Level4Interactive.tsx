@@ -568,7 +568,9 @@ const AnimManaging = ({ onDone, paused }: { onDone: () => void; paused: boolean 
     stepDelays.forEach((d, i) => schedule(() => setStepIdx(i), d));
     schedule(onDone, 4200);
     return clearAll;
-  }, [onDone, schedule, clearAll]);
+    // Important: do NOT depend on onDone here, or the whole sequence
+    // will be rescheduled every time parent state changes.
+  }, [schedule, clearAll]);
 
   useEffect(() => {
     if (stepIdx < 0) return;
@@ -579,10 +581,17 @@ const AnimManaging = ({ onDone, paused }: { onDone: () => void; paused: boolean 
 
     const afterLines = step.lines.length * 100 + 50;
     schedule(() => {
-      if (step.storeAction === 'list') setHighlight('all');
-      else if (step.storeAction === 'add' && step.storeTarget) {
-        setStore(prev => [...prev, { name: step.storeTarget!.split(':')[0], tag: step.storeTarget!.split(':')[1] || 'latest', size: '45 MB' }]);
-        setNewBadge(step.storeTarget!.split(':')[0]);
+      if (step.storeAction === 'list') {
+        setHighlight('all');
+      } else if (step.storeAction === 'add' && step.storeTarget) {
+        const [name, tag = 'latest'] = step.storeTarget.split(':');
+        setStore(prev => {
+          const without = prev.filter(img => !(img.name === name && img.tag === tag));
+          const next = [...without, { name, tag, size: '45 MB' }];
+          // Keep at most 4 images in the local store
+          return next.slice(-4);
+        });
+        setNewBadge(name);
         schedule(() => setNewBadge(null), 1200);
       } else if (step.storeAction === 'inspect' && step.storeTarget) {
         setHighlight(step.storeTarget);
@@ -591,8 +600,6 @@ const AnimManaging = ({ onDone, paused }: { onDone: () => void; paused: boolean 
       }
       schedule(() => setHighlight(null), 600);
     }, afterLines);
-
-    return clearAll;
   }, [stepIdx, schedule, clearAll]);
 
   useEffect(() => {
@@ -685,6 +692,10 @@ const Level4Interactive = () => {
     setAnimRunId(prev => prev + 1);
     setActive(id);
     setAnimating(true);
+
+    // Clear any in-flight log timers and previous log lines so replay feels fresh
+    logTimers.clearAll?.();
+    setInfoLines([]);
 
     const log = INFO_LOGS[id];
     const allLines = [
