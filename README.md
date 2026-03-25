@@ -2,6 +2,9 @@
 
 A web-based learning game that teaches Docker through 15 interactive, animated levels. Each level focuses on a specific topic—from “What is Docker?” to real-world deployment—with visualizations, terminal-style demos, and concept notes.
 
+## Demo 
+https://github.com/user-attachments/assets/079c79de-9969-48a9-b015-81c3543840d6
+
 ## What’s inside
 
 - **15 levels** — Fundamentals, images, containers, commands, Dockerfile, build, volumes, networking, Compose, lifecycle, registry, scaling, and a capstone “Real World Deployment” level.
