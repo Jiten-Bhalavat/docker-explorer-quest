@@ -53,7 +53,45 @@ Output is in the `dist/` folder. Serve it with any static host.
 
 ## Deploy
 
-Build with `npm run build` and deploy the `dist/` directory to any static hosting (Vercel, Netlify, GitHub Pages, etc.). No server or env vars are required for the app itself.
+### GitHub Pages (recommended for sharing)
+
+This repo includes a workflow that builds and publishes the site whenever you push to `main` or `master`.
+
+1. **Push this project to a GitHub repository** (any name is fine—the build picks up the repo name automatically).
+
+2. **Turn on GitHub Pages**
+   - In the repo: **Settings → Pages**
+   - Under **Build and deployment**, set **Source** to **GitHub Actions** (not “Deploy from a branch”).
+
+3. **Trigger a deploy**
+   - Push to `main` or `master`, or open **Actions → Deploy to GitHub Pages → Run workflow**.
+
+4. **Open your site**  
+   After the workflow succeeds, Pages shows the URL. For a project repo it looks like:
+
+   `https://<your-username>.github.io/<repository-name>/`
+
+   Example: `https://jiten.github.io/docker-explorer-quest/`
+
+**How it works**
+
+- `vite.config.ts` sets `base` in production using `GITHUB_REPOSITORY` in CI (`/<repo>/`), so assets load correctly under Pages.
+- `BrowserRouter` uses Vite’s `import.meta.env.BASE_URL` so routes match that base.
+- The workflow copies `dist/index.html` to `dist/404.html` so refreshing or opening a deep link like `/level/5` still loads the SPA.
+
+**Custom base path** (optional)
+
+```bash
+# Local production build with a fixed base (trailing slash optional)
+set VITE_BASE_URL=/my-subpath/
+npm run build
+```
+
+On Windows PowerShell: `$env:VITE_BASE_URL="/my-subpath/"; npm run build`
+
+### Other hosts
+
+Build with `npm run build` and upload the `dist/` folder to Vercel, Netlify, Cloudflare Pages, etc. For a host that serves the app at the domain root, use a normal build without `GITHUB_REPOSITORY` or `VITE_BASE_URL` (base defaults to `/`).
 
 ---
 

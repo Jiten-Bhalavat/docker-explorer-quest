@@ -14,7 +14,9 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter
+        basename={import.meta.env.BASE_URL.replace(/\/$/, "") || undefined}
+      >
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/level/:id" element={<Level />} />
